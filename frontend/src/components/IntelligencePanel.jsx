@@ -102,7 +102,9 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, wa
 
   // OSM + brief arrive progressively (null until their background fetch lands).
   const osm_data = osmData;
-  const deployment_brief = briefData?.brief;
+  // Defensive: convert any literal "\n" sequences to real newlines so
+  // react-markdown parses ## headers and **bold** correctly.
+  const deployment_brief = (briefData?.brief || '').replace(/\\n/g, '\n');
   const deployment_brief_source = briefData?.source;
   const isLiveBrief = (deployment_brief_source || '').startsWith('cerebras');
   const osmDefault = (osm_data?.source || '').includes('default');

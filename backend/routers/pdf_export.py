@@ -13,6 +13,7 @@ import os
 import re
 from datetime import datetime, timezone
 
+import markdown as md
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -126,8 +127,9 @@ def _build_html(intel: dict) -> str:
         "__SIM__": _pct(ward.get("sim_penetration")),
         "__COMPONENT_ROWS__": "\n".join(comp_rows),
         "__BRIEF_SOURCE__": brief_tag,
-        # Strip markdown bold/italic markers so the brief renders cleanly in print.
-        "__BRIEF__": (intel.get("deployment_brief") or "").replace("**", "").replace("*", "").strip(),
+        # Convert the markdown brief (## headers, **bold**) to real HTML so it
+        # renders as formatted text in the PDF rather than literal characters.
+        "__BRIEF_HTML__": md.markdown((intel.get("deployment_brief") or "").strip()),
     }
     for token, value in replacements.items():
         html = html.replace(token, str(value))
