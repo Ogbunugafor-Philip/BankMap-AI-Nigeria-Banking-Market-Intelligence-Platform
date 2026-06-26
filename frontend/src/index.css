@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-900 text-slate-100 font-sans antialiased;
+    margin: 0;
+    padding: 0;
+    /* Pages manage their own overflow: the dashboard root is h-screen
+       overflow-hidden, while the landing/login pages scroll normally. */
+    overflow-x: hidden;
+  }
+  * { box-sizing: border-box; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-surface-600 border border-slate-700/50 rounded-xl backdrop-blur-sm;
+  }
+  .metric-card {
+    @apply glass-card p-4 flex flex-col gap-1;
+  }
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3;
+  }
+  .progress-bar-track {
+    @apply w-full bg-slate-700 rounded-full h-1.5 overflow-hidden;
+  }
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
+  }
+  .ward-card {
+    @apply glass-card p-3 cursor-pointer hover:border-brand-500/50
+           hover:bg-surface-500 transition-all duration-200;
+  }
+  .ward-card.active {
+    @apply border-brand-500 bg-surface-500 ring-1 ring-brand-500/30;
+  }
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #0a0f1e !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.leaflet-control-attribution {
+  background: rgba(10,15,30,0.8) !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+}
+.leaflet-control-zoom a {
+  background: #1a2236 !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+.leaflet-popup-content-wrapper {
+  background: #1a2236 !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+}
+.leaflet-popup-tip { background: #1a2236 !important; }

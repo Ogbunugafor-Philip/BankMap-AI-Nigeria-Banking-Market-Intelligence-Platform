@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<style>
+  @page { size: A4; margin: 14mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; color: #1e293b; font-size: 11px; margin: 0; }
+  .header { display: flex; justify-content: space-between; align-items: flex-end;
+            border-bottom: 3px solid #0369a1; padding-bottom: 8px; margin-bottom: 14px; }
+  .brand { font-size: 20px; font-weight: 800; color: #0369a1; letter-spacing: -0.5px; }
+  .brand span { color: #0ea5e9; }
+  .brand-sub { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 2px; }
+  .report-meta { text-align: right; font-size: 9px; color: #64748b; }
+  .report-title { font-size: 11px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 1px; }
+
+  .ward-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .ward-name { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.1; }
+  .ward-loc { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .boi-circle { width: 84px; height: 84px; border-radius: 50%; color: #fff; text-align: center;
+                display: table-cell; vertical-align: middle; }
+  .boi-score { font-size: 30px; font-weight: 800; line-height: 1; }
+  .boi-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+  .boi-conf { font-size: 9px; color: #64748b; text-align: center; margin-top: 4px; }
+
+  .section-title { font-size: 10px; font-weight: 700; color: #0369a1; text-transform: uppercase;
+                   letter-spacing: 1.5px; margin: 16px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+
+  .metrics { width: 100%; border-collapse: collapse; }
+  .metrics td { width: 25%; padding: 8px; border: 1px solid #e2e8f0; background: #f8fafc; }
+  .metric-label { font-size: 8px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .metric-value { font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+
+  .bar-row { display: flex; align-items: center; margin-bottom: 6px; }
+  .bar-label { width: 130px; font-size: 10px; color: #334155; }
+  .bar-track { flex: 1; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; }
+  .bar-val { width: 30px; text-align: right; font-size: 10px; font-weight: 700; color: #0f172a; }
+
+  .brief-box { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 12px;
+               font-size: 10.5px; line-height: 1.55; color: #1e293b; white-space: pre-wrap; }
+  .brief-tag { display: inline-block; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+               background: #ede9fe; color: #6d28d9; margin-left: 6px; }
+
+  .roi-cards { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  .roi-cards td { width: 25%; padding: 8px; border: 1px solid #e2e8f0; }
+  .whatif { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .whatif th { background: #0369a1; color: #fff; padding: 6px; text-align: left; font-size: 9px;
+               text-transform: uppercase; letter-spacing: 0.5px; }
+  .whatif td { padding: 6px; border-bottom: 1px solid #e2e8f0; font-variant-numeric: tabular-nums; }
+  .whatif tr.active td { background: #e0f2fe; font-weight: 700; }
+
+  .footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid #e2e8f0;
+            font-size: 8px; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">BankMap<span>AI</span></div>
+      <div class="brand-sub">Nigeria Banking Intelligence</div>
+    </div>
+    <div class="report-meta">
+      <div class="report-title">Ward Intelligence Report</div>
+      <div>Generated __DATE__</div>
+    </div>
+  </div>
+
+  <div class="ward-row">
+    <div>
+      <div class="ward-name">__WARD_NAME__</div>
+      <div class="ward-loc">__LGA_NAME__ LGA &middot; __STATE_NAME__ State</div>
+    </div>
+    <div>
+      <div class="boi-circle" style="background: __BOI_COLOR__;">
+        <div class="boi-score">__BOI_SCORE__</div>
+        <div class="boi-label">__BOI_LABEL__</div>
+      </div>
+      <div class="boi-conf">__CONFIDENCE__ confidence</div>
+    </div>
+  </div>
+
+  <div class="section-title">Key Metrics</div>
+  <table class="metrics"><tr>
+    <td><div class="metric-label">Population</div><div class="metric-value">__POPULATION__</div></td>
+    <td><div class="metric-label">Unbanked Adults</div><div class="metric-value">__UNBANKED__</div></td>
+    <td><div class="metric-label">Nearest Bank</div><div class="metric-value">__DISTANCE__</div></td>
+    <td><div class="metric-label">SIM Penetration</div><div class="metric-value">__SIM__</div></td>
+  </tr></table>
+
+  <div class="section-title">Opportunity Score Breakdown</div>
+  __BOI_BARS__
+
+  <div class="section-title">AI Deployment Brief <span class="brief-tag">__BRIEF_SOURCE__</span></div>
+  <div class="brief-box">__BRIEF__</div>
+
+  <div class="section-title">Financial Projection &mdash; __FSO_COUNT__ FSO Deployment</div>
+  <table class="roi-cards"><tr>
+    <td><div class="metric-label">Acquisition Cost</div><div class="metric-value">__ACQ_COST__</div></td>
+    <td><div class="metric-label">Expected Deposits</div><div class="metric-value">__DEPOSITS__</div></td>
+    <td><div class="metric-label">Yearly Revenue</div><div class="metric-value">__REVENUE__</div></td>
+    <td><div class="metric-label">Payback</div><div class="metric-value">__PAYBACK__</div></td>
+  </tr></table>
+  <table class="whatif">
+    <tr><th>FSOs</th><th>Monthly Accounts</th><th>Yearly Revenue</th><th>Payback</th></tr>
+    __WHATIF_ROWS__
+  </table>
+
+  <div class="footer">
+    Generated by BankMap AI &middot; aibankmap.space<br/>
+    Data: GRID3 &middot; EFInA &middot; CBN &middot; NBS &middot; NCC &middot; OpenStreetMap<br/>
+    Banking Opportunity Index is a composite estimate for prioritisation, not financial advice.
+  </div>
+</body>
+</html>

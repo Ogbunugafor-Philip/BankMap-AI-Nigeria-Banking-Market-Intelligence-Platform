@@ -1,0 +1,37 @@
+# ---- Web framework ----
+fastapi
+uvicorn
+
+# ---- ORM + Postgres driver ----
+sqlalchemy
+psycopg2-binary
+asyncpg
+alembic
+
+# ---- Spatial stack ----
+geoalchemy2          # SQLAlchemy <-> PostGIS bridge (required by database.py / models.py)
+geopandas
+shapely
+fiona
+pyproj
+
+# ---- Data wrangling ----
+pandas
+numpy
+
+# ---- Config ----
+python-dotenv
+
+# ---- Fuzzy name matching (Nigerian dataset names are inconsistent across sources) ----
+rapidfuzz            # falls back to stdlib difflib if unavailable
+
+# HTTP client for Cerebras + Overpass services
+requests
+openpyxl
+rasterstats
+pdfplumber
+
+# Auth (demo JWT login)
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1

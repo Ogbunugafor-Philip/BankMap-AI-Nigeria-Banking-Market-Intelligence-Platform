@@ -1,0 +1,30 @@
+# Environment
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Node
+frontend/node_modules/
+frontend/build/
+
+# Data files (too large for git)
+backend/data/raw/
+backend/data/processed/
+
+# Logs
+*.log
+/tmp/
+
+# Database
+*.sql
+*.dump
+
+# OS
+.DS_Store
+Thumbs.db
