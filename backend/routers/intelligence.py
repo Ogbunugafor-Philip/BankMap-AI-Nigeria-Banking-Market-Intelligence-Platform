@@ -49,20 +49,29 @@ def _ward_data(db: Session, ward: models.Ward) -> dict:
     }
 
 
-_NATIONAL_RANGE = None  # cached (population*unbanked_rate) min/max across all wards
+_NATIONAL_RANGE = None  # cached (5th, 95th) percentile of unbanked-adult counts
 
 
 def _national_unbanked_range(db: Session):
     """
-    Return (min, max) of unbanked-adult counts across ALL wards, so live BOI
-    recomputation matches the nationally-normalized stored scores. Cached for the
-    process lifetime (the range only changes on a data reload + restart).
+    Return the (5th, 95th) percentile of unbanked-adult counts across ALL wards,
+    so live BOI recomputation matches the nationally-normalized stored scores
+    (compute_boi.py uses the same percentile band). Cached for the process
+    lifetime (the range only changes on a data reload + restart).
     """
     global _NATIONAL_RANGE
     if _NATIONAL_RANGE is None:
-        expr = func.coalesce(models.Ward.population, 0) * func.coalesce(models.Ward.unbanked_rate, 0.0)
-        lo, hi = db.query(func.min(expr), func.max(expr)).one()
-        _NATIONAL_RANGE = (float(lo or 0), float(hi or 1))
+        import numpy as np
+
+        rows = db.query(models.Ward.population, models.Ward.unbanked_rate).all()
+        values = [p * r for p, r in rows if p and r]
+        if values:
+            _NATIONAL_RANGE = (
+                float(np.percentile(values, 5)),
+                float(np.percentile(values, 95)),
+            )
+        else:
+            _NATIONAL_RANGE = (0.0, 1.0)
     return _NATIONAL_RANGE
 
 

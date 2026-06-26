@@ -27,12 +27,24 @@ def main():
         return
     print(f"[boi] Computing BOI for {total} wards ...")
 
-    # National min/max of unbanked-adult counts -> national normalization.
+    # National normalization range for the unbanked-population score.
+    # Use the 5th–95th percentiles (not absolute min/max) so a few outlier
+    # mega-wards don't crush everyone else; wards beyond the band cap at 0/100.
+    import numpy as np
+
     all_wards = session.query(models.Ward).all()
-    unbanked_counts = [(w.population or 0) * (w.unbanked_rate or 0.0) for w in all_wards]
-    national_min = min(unbanked_counts) if unbanked_counts else 0
-    national_max = max(unbanked_counts) if unbanked_counts else 1
-    print(f"National unbanked range: {national_min:,.0f} to {national_max:,.0f} adults")
+    unbanked_values = [
+        w.population * w.unbanked_rate
+        for w in all_wards
+        if w.population and w.unbanked_rate
+    ]
+    national_min = float(np.percentile(unbanked_values, 5))
+    national_max = float(np.percentile(unbanked_values, 95))
+    print(
+        f"National unbanked range (5th-95th percentile): "
+        f"{national_min:,.0f} to {national_max:,.0f} adults"
+    )
+    print(f"Absolute max for reference: {max(unbanked_values):,.0f}")
 
     processed = 0
     try:
