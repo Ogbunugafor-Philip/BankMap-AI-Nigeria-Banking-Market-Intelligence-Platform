@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Eye, EyeOff, Info, Loader2 } from 'lucide-react';
+import { BarChart3, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { login, saveAuth } from '../services/api';
 
 export default function LoginPage() {
@@ -83,17 +83,6 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign In to Dashboard'}
           </button>
         </form>
-
-        {/* Demo credentials */}
-        <div className="mt-6 bg-surface-900 rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-medium">
-            <Info size={13} /> Demo Access
-          </div>
-          <div className="mt-2 text-xs text-slate-500 font-mono leading-relaxed">
-            <div>Email: philiposita1041@gmail.com</div>
-            <div>Password: Osita@1989</div>
-          </div>
-        </div>
 
         <p className="mt-8 text-xs text-slate-600 text-center">
           Powered by Cerebras AI · Data: GRID3 · EFInA · CBN

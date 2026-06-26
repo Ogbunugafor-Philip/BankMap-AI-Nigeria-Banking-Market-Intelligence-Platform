@@ -68,9 +68,6 @@ export default function LandingPage() {
             <Link to="/dashboard" className="bg-brand-600 hover:bg-brand-700 rounded-xl px-8 py-4 font-semibold text-white transition-colors">
               Access Dashboard
             </Link>
-            <a href="/api/docs" target="_blank" rel="noreferrer" className="border border-slate-600 hover:border-slate-400 rounded-xl px-8 py-4 text-slate-300 transition-colors">
-              View API Docs
-            </a>
           </div>
           <div className="flex flex-wrap gap-10 md:gap-12 justify-center mt-16">
             {STATS.map(([num, label]) => (
