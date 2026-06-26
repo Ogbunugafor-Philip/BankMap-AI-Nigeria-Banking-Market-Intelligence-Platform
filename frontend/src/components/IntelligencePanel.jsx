@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
   MapPin, Users, UserX, Signal, CheckCircle2, Sparkles, Activity,
-  Building2, Store, Landmark, Route,
+  Building2, Store, Landmark, Route, Download,
 } from 'lucide-react';
+import { getToken } from '../services/api';
 import BOIBadge from './BOIBadge';
 import LoadingSpinner from './LoadingSpinner';
 import Shimmer from './Shimmer';
@@ -53,6 +54,32 @@ function EmptyState({ lgaSummary }) {
 }
 
 export default function IntelligencePanel({ selectedWard, osmData, briefData, wardScores, lgaSummary, loading }) {
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handlePDFExport = async (wardId) => {
+    setPdfLoading(true);
+    try {
+      const response = await fetch(`/api/wards/${wardId}/export-pdf`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!response.ok) throw new Error('PDF generation failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bankmap_ward_report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('PDF export error:', err);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <aside className={PANEL}>
@@ -241,6 +268,28 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, wa
             </div>
           </div>
         )}
+
+        {/* PDF EXPORT */}
+        <button
+          onClick={() => handlePDFExport(ward.id)}
+          disabled={pdfLoading}
+          className="w-full mt-4 flex items-center justify-center gap-2
+            bg-brand-600 hover:bg-brand-700 disabled:opacity-50
+            disabled:cursor-not-allowed rounded-xl py-3 px-4
+            font-semibold text-white transition-all duration-200"
+        >
+          {pdfLoading ? (
+            <>
+              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Generating PDF...
+            </>
+          ) : (
+            <>
+              <Download size={16} />
+              Export Ward Report PDF
+            </>
+          )}
+        </button>
       </div>
     </aside>
   );
