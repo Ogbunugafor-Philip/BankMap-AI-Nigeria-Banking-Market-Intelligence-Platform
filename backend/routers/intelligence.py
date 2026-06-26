@@ -49,15 +49,21 @@ def _ward_data(db: Session, ward: models.Ward) -> dict:
     }
 
 
-def _lga_unbanked_range(db: Session, lga_id: int):
-    """Return (min, max) of population*unbanked_rate across the LGA's wards."""
-    rows = (
-        db.query(models.Ward.population, models.Ward.unbanked_rate)
-        .filter(models.Ward.lga_id == lga_id)
-        .all()
-    )
-    vals = [(p or 0) * (r or 0.0) for p, r in rows]
-    return (min(vals), max(vals)) if vals else (None, None)
+_NATIONAL_RANGE = None  # cached (population*unbanked_rate) min/max across all wards
+
+
+def _national_unbanked_range(db: Session):
+    """
+    Return (min, max) of unbanked-adult counts across ALL wards, so live BOI
+    recomputation matches the nationally-normalized stored scores. Cached for the
+    process lifetime (the range only changes on a data reload + restart).
+    """
+    global _NATIONAL_RANGE
+    if _NATIONAL_RANGE is None:
+        expr = func.coalesce(models.Ward.population, 0) * func.coalesce(models.Ward.unbanked_rate, 0.0)
+        lo, hi = db.query(func.min(expr), func.max(expr)).one()
+        _NATIONAL_RANGE = (float(lo or 0), float(hi or 1))
+    return _NATIONAL_RANGE
 
 
 def _centroid(db: Session, ward: models.Ward):
@@ -92,7 +98,7 @@ def lga_intelligence(
     if lga is None:
         raise HTTPException(status_code=404, detail="LGA not found")
 
-    lga_min, lga_max = _lga_unbanked_range(db, lga_id)
+    national_min, national_max = _national_unbanked_range(db)
 
     # Pull wards with their stored BOI, ordered so the best opportunities get the
     # (expensive) live OSM calls.
@@ -111,7 +117,7 @@ def lga_intelligence(
             # Live OSM + live-adjusted BOI for the top wards.
             osm = get_osm_activity(lat, lon, timeout=20)
             wd = _ward_data(db, ward)
-            boi = compute_boi(wd, lga_min, lga_max, osm_score=osm["score"])
+            boi = compute_boi(wd, national_min, national_max, osm_score=osm["score"])
             score, label = boi.boi_score, boi.boi_label
             components, confidence = boi.components, boi.data_confidence
         else:
@@ -173,18 +179,20 @@ def ward_intelligence(ward_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ward not found")
 
     wd = _ward_data(db, ward)
-    lga_min, lga_max = _lga_unbanked_range(db, ward.lga_id)
+    national_min, national_max = _national_unbanked_range(db)
     lat, lon = _centroid(db, ward)
 
-    osm = get_osm_activity(lat, lon)
-    boi = compute_boi(wd, lga_min, lga_max, osm_score=osm["score"])
+    # Shorter timeouts so this combined endpoint degrades gracefully:
+    # OSM 8s (else default 50), Cerebras 15s (else template brief).
+    osm = get_osm_activity(lat, lon, timeout=8)
+    boi = compute_boi(wd, national_min, national_max, osm_score=osm["score"])
 
     # ROI for 2 FSOs (+ what-if 1–4), informed by the live BOI.
     roi_input = dict(wd, boi_score=boi.boi_score)
     roi = compute_roi_with_whatif(roi_input, fso_count=2, max_fso=4)
 
     # AI deployment brief from real data.
-    brief = generate_deployment_brief(wd, boi.as_dict(), roi)
+    brief = generate_deployment_brief(wd, boi.as_dict(), roi, timeout=15)
 
     return {
         "ward": wd,
@@ -194,6 +202,104 @@ def ward_intelligence(ward_id: int, db: Session = Depends(get_db)):
         "roi": roi,
         "deployment_brief": brief["brief"],
         "deployment_brief_source": brief["source"],
+    }
+
+
+# --------------------------------------------------------------------------
+# GET /wards/{ward_id}/intelligence/base   (instant — stored data only)
+# --------------------------------------------------------------------------
+@router.get("/wards/{ward_id}/intelligence/base")
+def ward_intelligence_base(ward_id: int, db: Session = Depends(get_db)):
+    """
+    Fast (<200ms) ward report from STORED data only — no OSM, no Cerebras.
+    Returns demographics, the stored (nationally-normalized) BOI + explanation,
+    and an instant ROI projection. The frontend renders this immediately and then
+    fills in OSM + AI brief from the dedicated endpoints below.
+    """
+    ward = db.get(models.Ward, ward_id)
+    if ward is None:
+        raise HTTPException(status_code=404, detail="Ward not found")
+
+    wd = _ward_data(db, ward)
+    stored = db.query(models.WardBOI).filter(models.WardBOI.ward_id == ward_id).one_or_none()
+
+    component_scores = {
+        "unbanked_population_score": stored.unbanked_population_score if stored else None,
+        "bank_absence_score": stored.bank_absence_score if stored else None,
+        "economic_viability_score": stored.economic_viability_score if stored else None,
+        "poverty_filter_score": stored.poverty_filter_score if stored else None,
+        "osm_activity_score": stored.osm_activity_score if stored else None,
+    }
+    # `components` mirrors the keys the panel's progress bars expect.
+    components = {
+        "unbanked_population": stored.unbanked_population_score if stored else None,
+        "bank_absence": stored.bank_absence_score if stored else None,
+        "economic_viability": stored.economic_viability_score if stored else None,
+        "poverty_filter": stored.poverty_filter_score if stored else None,
+        "osm_activity": stored.osm_activity_score if stored else None,
+    }
+    boi = {
+        "boi_score": stored.boi_score if stored else None,
+        "boi_label": stored.boi_label if stored else None,
+        "data_confidence": stored.data_confidence if stored else None,
+        "components": components,
+        "component_scores": component_scores,
+        "explanation": stored.explanation if stored else {},
+    }
+
+    roi_input = dict(wd, boi_score=(stored.boi_score if stored else 50))
+    roi = compute_roi_with_whatif(roi_input, fso_count=2, max_fso=4)
+
+    return {
+        "ward": wd,
+        "boi": boi,
+        "roi": roi,
+        "data_confidence": stored.data_confidence if stored else None,
+    }
+
+
+# --------------------------------------------------------------------------
+# GET /wards/{ward_id}/osm   (OSM only)
+# --------------------------------------------------------------------------
+@router.get("/wards/{ward_id}/osm")
+def ward_osm(ward_id: int, db: Session = Depends(get_db)):
+    """Live OpenStreetMap activity for a ward only (timeout 20s, default on failure)."""
+    ward = db.get(models.Ward, ward_id)
+    if ward is None:
+        raise HTTPException(status_code=404, detail="Ward not found")
+    lat, lon = _centroid(db, ward)
+    return get_osm_activity(lat, lon, timeout=20)
+
+
+# --------------------------------------------------------------------------
+# GET /wards/{ward_id}/brief   (Cerebras only)
+# --------------------------------------------------------------------------
+@router.get("/wards/{ward_id}/brief")
+def ward_brief(
+    ward_id: int,
+    fso_count: int = Query(2, ge=1, le=10),
+    db: Session = Depends(get_db),
+):
+    """Cerebras deployment brief only, for a given FSO count (timeout 20s)."""
+    ward = db.get(models.Ward, ward_id)
+    if ward is None:
+        raise HTTPException(status_code=404, detail="Ward not found")
+
+    wd = _ward_data(db, ward)
+    stored = db.query(models.WardBOI).filter(models.WardBOI.ward_id == ward_id).one_or_none()
+    boi = {
+        "boi_score": stored.boi_score if stored else None,
+        "boi_label": stored.boi_label if stored else None,
+        "data_confidence": stored.data_confidence if stored else None,
+    }
+    roi = compute_roi(dict(wd, boi_score=(stored.boi_score if stored else 50)), fso_count)
+    brief = generate_deployment_brief(wd, boi, roi, timeout=20)
+    return {
+        "ward_id": ward_id,
+        "fso_count": fso_count,
+        "brief": brief["brief"],
+        "source": brief["source"],
+        "model": brief.get("model"),
     }
 
 

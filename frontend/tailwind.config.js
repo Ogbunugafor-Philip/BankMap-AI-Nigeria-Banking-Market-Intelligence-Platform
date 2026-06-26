@@ -32,11 +32,13 @@ module.exports = {
         'fade-in':    'fadeIn 0.3s ease-in-out',
         'slide-in':   'slideIn 0.3s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+        'shimmer':    'shimmer 1.5s infinite',
       },
       keyframes: {
         fadeIn:  { '0%': { opacity: '0' },              '100%': { opacity: '1' } },
         slideIn: { '0%': { transform: 'translateX(20px)', opacity: '0' },
                    '100%': { transform: 'translateX(0)',   opacity: '1' } },
+        shimmer: { '100%': { transform: 'translateX(100%)' } },
       },
     },
   },

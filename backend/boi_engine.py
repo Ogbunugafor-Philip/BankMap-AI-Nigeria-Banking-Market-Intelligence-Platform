@@ -78,27 +78,29 @@ def label_for(score: float) -> str:
 # --------------------------------------------------------------------------
 # Individual component scorers
 # --------------------------------------------------------------------------
-def _unbanked_population_score(population, unbanked_rate, lga_min, lga_max):
+def _unbanked_population_score(population, unbanked_rate, national_min, national_max):
     """
     Unbanked adults = population × unbanked_rate, then min-max normalized to
-    0–100 *within the ward's LGA* so the score is relative to local peers.
+    0–100 against the NATIONAL range of unbanked-adult counts so a ward is ranked
+    against every other ward in Nigeria (not just its LGA peers).
     """
     pop = population or 0
     rate = unbanked_rate if unbanked_rate is not None else 0.0
-    value = pop * rate
+    unbanked_adults = pop * rate
 
-    if lga_max is None or lga_min is None or lga_max <= lga_min:
-        # Only one ward (or no spread) in the LGA: neutral-high midpoint.
-        score = 50.0
-        norm_note = "single ward in LGA (no spread to normalize against)"
+    if national_max is not None and national_min is not None and national_max > national_min:
+        score = (unbanked_adults - national_min) / (national_max - national_min) * 100.0
     else:
-        score = (value - lga_min) / (lga_max - lga_min) * 100.0
-        norm_note = f"normalized within LGA range [{lga_min:,.0f}–{lga_max:,.0f}]"
+        score = 50.0
 
     score = max(0.0, min(100.0, score))
+    rate_pct = round(rate * 100)
+    lo = national_min or 0
+    hi = national_max or 1
     expl = (
-        f"~{value:,.0f} unbanked adults "
-        f"({pop:,} people × {rate:.0%} unbanked); {norm_note}."
+        f"~{unbanked_adults:,.0f} unbanked adults "
+        f"({rate_pct}% of {pop:,} residents); ranked nationally "
+        f"(range {lo:,.0f}–{hi:,.0f})"
     )
     return score, expl
 
@@ -163,23 +165,23 @@ def _osm_activity_score(osm_score):
 # --------------------------------------------------------------------------
 def compute_boi(
     ward: dict,
-    lga_unbanked_min: Optional[float] = None,
-    lga_unbanked_max: Optional[float] = None,
+    national_min: Optional[float] = 0,
+    national_max: Optional[float] = 1,
     osm_score: Optional[float] = None,
 ) -> BOIResult:
     """
     Compute the BOI for a single ward.
 
     `ward` is a dict with keys: population, unbanked_rate, nearest_bank_distance_km,
-    sim_penetration, poverty_index. `lga_unbanked_min/max` give the LGA's range of
-    unbanked-adult counts (for normalization). `osm_score` is the live OSM score
-    (or None to use the default).
+    sim_penetration, poverty_index. `national_min/max` give the NATIONAL range of
+    unbanked-adult counts (so the unbanked-population score ranks the ward against
+    every ward in Nigeria). `osm_score` is the live OSM score (or None for default).
     """
     components, weighted, explanation = {}, {}, {}
 
     s, e = _unbanked_population_score(
         ward.get("population"), ward.get("unbanked_rate"),
-        lga_unbanked_min, lga_unbanked_max,
+        national_min, national_max,
     )
     components["unbanked_population"], explanation["unbanked_population"] = s, e
 

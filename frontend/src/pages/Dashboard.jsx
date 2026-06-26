@@ -5,7 +5,8 @@ import Sidebar from '../components/Sidebar';
 import MapPanel from '../components/MapPanel';
 import IntelligencePanel from '../components/IntelligencePanel';
 import {
-  getStates, getLGAs, getLGASummary, getWardIntelligence, getWardROI,
+  getStates, getLGAs, getLGASummary, getWardROI,
+  getWardBase, getWardOSM, getWardBrief,
   getUser, clearAuth,
 } from '../services/api';
 
@@ -19,7 +20,9 @@ export default function Dashboard() {
   const [selectedLGA, setSelectedLGA] = useState(null);
   const [lgaSummary, setLgaSummary] = useState(null);
   const [selectedWardId, setSelectedWardId] = useState(null);
-  const [selectedWard, setSelectedWard] = useState(null);
+  const [selectedWard, setSelectedWard] = useState(null);  // base data (instant)
+  const [osmData, setOsmData] = useState(null);            // stage 2 (background)
+  const [briefData, setBriefData] = useState(null);        // stage 3 (background)
   const [fsoCount, setFsoCount] = useState(2);
   const [roiData, setRoiData] = useState(null);
   const [loading, setLoading] = useState({ states: false, lgas: false, map: false, ward: false, roi: false });
@@ -57,14 +60,36 @@ export default function Dashboard() {
   const handleWardSelect = useCallback((wardId) => {
     setSelectedWardId(wardId);
     setSelectedWard(null);
+    setOsmData(null);
+    setBriefData(null);
+    setRoiData(null);
     setFsoCount(2);
     setFlag('ward', true);
-    getWardIntelligence(wardId)
-      .then(setSelectedWard)
-      .catch(() => setSelectedWard(null))
-      .finally(() => setFlag('ward', false));
+
+    // Stage 1: instant base data.
+    getWardBase(wardId)
+      .then((base) => {
+        setSelectedWard(base);
+        setFlag('ward', false);
+        // Stages 2 & 3: OSM + AI brief load in the background.
+        getWardOSM(wardId).then(setOsmData).catch(() =>
+          setOsmData({ score: 50, total_nodes: null, breakdown: {}, source: 'default (error)' }));
+        getWardBrief(wardId, 2).then(setBriefData).catch(() =>
+          setBriefData({ brief: 'Brief unavailable.', source: 'error' }));
+      })
+      .catch(() => { setSelectedWard(null); setFlag('ward', false); });
   }, []);
-  const handleFSOChange = useCallback((count) => { setFsoCount(count); }, []);
+
+  // FSO slider change -> only the brief needs regenerating (ROI is handled by the
+  // effect above; both show a shimmer while refetching).
+  const handleFSOChange = useCallback((count) => {
+    setFsoCount(count);
+    if (selectedWardId) {
+      setBriefData(null);
+      getWardBrief(selectedWardId, count).then(setBriefData).catch(() =>
+        setBriefData({ brief: 'Brief unavailable.', source: 'error' }));
+    }
+  }, [selectedWardId]);
 
   const handleSignOut = () => { clearAuth(); navigate('/'); };
 
@@ -117,6 +142,8 @@ export default function Dashboard() {
         />
         <IntelligencePanel
           selectedWard={selectedWard}
+          osmData={osmData}
+          briefData={briefData}
           lgaSummary={lgaSummary}
           loading={loading.ward}
           fsoCount={fsoCount}

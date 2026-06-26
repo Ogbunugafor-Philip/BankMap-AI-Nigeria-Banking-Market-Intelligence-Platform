@@ -6,6 +6,7 @@ import {
 import BOIBadge from './BOIBadge';
 import LoadingSpinner from './LoadingSpinner';
 import PDFExportButton from './PDFExportButton';
+import Shimmer from './Shimmer';
 import {
   formatNumber, formatNGN, formatPercent, formatDistance, formatConfidence,
   getBOIColor, getProgressColor,
@@ -66,7 +67,7 @@ function EmptyState({ lgaSummary }) {
   );
 }
 
-export default function IntelligencePanel({ selectedWard, lgaSummary, loading, fsoCount, roiData, onFSOChange }) {
+export default function IntelligencePanel({ selectedWard, osmData, briefData, lgaSummary, loading, fsoCount, roiData, onFSOChange }) {
   if (loading) {
     return (
       <aside className={PANEL}>
@@ -80,13 +81,17 @@ export default function IntelligencePanel({ selectedWard, lgaSummary, loading, f
     return <aside className={PANEL}><EmptyState lgaSummary={lgaSummary} /></aside>;
   }
 
-  const { ward, boi, osm_data, deployment_brief, deployment_brief_source } = selectedWard;
+  const { ward, boi } = selectedWard;
   const roi = roiData?.roi || selectedWard.roi;
   const unbanked = Math.round((ward.population || 0) * (ward.unbanked_rate || 0));
   const explanations = boi?.explanation
     ? ['unbanked_population', 'bank_absence', 'economic_viability', 'poverty_filter', 'osm_activity']
         .map(k => boi.explanation[k]).filter(Boolean)
     : [];
+  // OSM + brief arrive progressively (null until their background fetch lands).
+  const osm_data = osmData;
+  const deployment_brief = briefData?.brief;
+  const deployment_brief_source = briefData?.source;
   const isLiveBrief = (deployment_brief_source || '').startsWith('cerebras');
   const osmDefault = (osm_data?.source || '').includes('default');
   const br = osm_data?.breakdown || {};
@@ -151,35 +156,46 @@ export default function IntelligencePanel({ selectedWard, lgaSummary, loading, f
 
         {/* SECTION 4 — OSM MARKET DATA */}
         <h3 className="section-title">Live Market Intelligence</h3>
-        <div className="glass-card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Activity size={16} className="text-brand-500" />
-              <span className="text-sm text-slate-200">OpenStreetMap Overpass API</span>
+        {!osm_data ? (
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-3">
+              <Activity size={16} className="text-brand-500 animate-pulse" /> Querying OpenStreetMap…
             </div>
-            {osmDefault
-              ? <span className="text-[10px] font-semibold text-slate-400 bg-slate-500/20 border border-slate-500/30 px-2 py-0.5 rounded-full">Limited data</span>
-              : <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">Live</span>}
+            <div className="grid grid-cols-4 gap-2">
+              {[0, 1, 2, 3].map(i => <Shimmer key={i} height="h-12" />)}
+            </div>
           </div>
-          {osmDefault ? (
-            <p className="text-xs text-slate-400">Limited data available for this ward; using a neutral activity baseline.</p>
-          ) : (
-            <>
-              <p className="text-xs text-slate-400 mb-3">
-                <span className="font-bold text-white">{osm_data?.total_nodes ?? 0}</span> economic features within 5&nbsp;km
-              </p>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                {[[Store, 'Shops', br.shops], [Building2, 'Markets', br.markets], [Landmark, 'Banks', br.banks], [Route, 'Roads', br.roads]].map(([Icon, lbl, val]) => (
-                  <div key={lbl} className="bg-surface-700 rounded-lg p-2">
-                    <Icon size={14} className="mx-auto text-slate-400 mb-1" />
-                    <div className="text-sm font-bold text-white tabular-nums">{val ?? 0}</div>
-                    <div className="text-[9px] uppercase text-slate-500">{lbl}</div>
-                  </div>
-                ))}
+        ) : (
+          <div className="glass-card p-4 animate-fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Activity size={16} className="text-brand-500" />
+                <span className="text-sm text-slate-200">OpenStreetMap Overpass API</span>
               </div>
-            </>
-          )}
-        </div>
+              {osmDefault
+                ? <span className="text-[10px] font-semibold text-slate-400 bg-slate-500/20 border border-slate-500/30 px-2 py-0.5 rounded-full">Limited data</span>
+                : <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">Live</span>}
+            </div>
+            {osmDefault ? (
+              <p className="text-xs text-slate-400">Limited data available for this ward; using a neutral activity baseline.</p>
+            ) : (
+              <>
+                <p className="text-xs text-slate-400 mb-3">
+                  <span className="font-bold text-white">{osm_data?.total_nodes ?? 0}</span> economic features within 5&nbsp;km
+                </p>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {[[Store, 'Shops', br.shops], [Building2, 'Markets', br.markets], [Landmark, 'Banks', br.banks], [Route, 'Roads', br.roads]].map(([Icon, lbl, val]) => (
+                    <div key={lbl} className="bg-surface-700 rounded-lg p-2">
+                      <Icon size={14} className="mx-auto text-slate-400 mb-1" />
+                      <div className="text-sm font-bold text-white tabular-nums">{val ?? 0}</div>
+                      <div className="text-[9px] uppercase text-slate-500">{lbl}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <Divider />
 
@@ -190,14 +206,28 @@ export default function IntelligencePanel({ selectedWard, lgaSummary, loading, f
             <Sparkles size={11} /> Powered by Cerebras AI
           </span>
         </div>
-        <div className="mb-2">
-          {isLiveBrief
-            ? <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">Live AI</span>
-            : <span className="text-[10px] font-semibold text-slate-400 bg-slate-500/20 border border-slate-500/30 px-2 py-0.5 rounded-full">Template</span>}
-        </div>
-        <div className="bg-surface-900 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 leading-relaxed not-italic whitespace-pre-line">
-          {deployment_brief}
-        </div>
+        {!briefData ? (
+          <div className="bg-surface-900 border border-slate-700 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-3">
+              <Sparkles size={14} className="text-purple-300 animate-pulse" /> Generating AI brief…
+            </div>
+            <Shimmer height="h-3" />
+            <Shimmer height="h-3" className="mt-2 w-11/12" />
+            <Shimmer height="h-3" className="mt-2 w-10/12" />
+            <Shimmer height="h-3" className="mt-2 w-8/12" />
+          </div>
+        ) : (
+          <div className="animate-fade-in">
+            <div className="mb-2">
+              {isLiveBrief
+                ? <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">Live AI</span>
+                : <span className="text-[10px] font-semibold text-slate-400 bg-slate-500/20 border border-slate-500/30 px-2 py-0.5 rounded-full">Template</span>}
+            </div>
+            <div className="bg-surface-900 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 leading-relaxed not-italic whitespace-pre-line">
+              {deployment_brief}
+            </div>
+          </div>
+        )}
 
         <Divider />
 

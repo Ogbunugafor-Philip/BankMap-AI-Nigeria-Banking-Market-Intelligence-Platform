@@ -60,4 +60,12 @@ export const getWardIntelligence = (wardId) =>
 export const getWardROI = (wardId, fsoCount) =>
   api.get(`/wards/${wardId}/roi?fso_count=${fsoCount}`).then(r => r.data);
 
+// Progressive loading: instant base data, then OSM + AI brief in the background.
+export const getWardBase = (wardId) =>
+  api.get(`/wards/${wardId}/intelligence/base`).then(r => r.data);
+export const getWardOSM = (wardId) =>
+  api.get(`/wards/${wardId}/osm`).then(r => r.data);
+export const getWardBrief = (wardId, fsoCount = 2) =>
+  api.get(`/wards/${wardId}/brief?fso_count=${fsoCount}`).then(r => r.data);
+
 export default api;

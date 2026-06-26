@@ -236,8 +236,16 @@ def main():
         session.commit()
         print(f"[remaining] Geometry+indicators done. inserted={inserted}, updated={updated}, skipped={skipped}")
 
-        # BOI — normalize unbanked-population within each LGA.
+        # BOI — unbanked-population normalized against the NATIONAL range.
+        # (Authoritative scores come from scripts/compute_boi.py, which is rerun
+        # across all wards afterwards; this keeps freshly-loaded wards consistent.)
         print("[remaining] Computing BOI ...")
+        all_counts = [
+            (p or 0) * (r or 0.0)
+            for p, r in session.query(models.Ward.population, models.Ward.unbanked_rate).all()
+        ]
+        national_min = min(all_counts) if all_counts else 0
+        national_max = max(all_counts) if all_counts else 1
         wards = session.query(models.Ward).filter(models.Ward.id.in_(new_ward_ids)).all()
         by_lga = defaultdict(list)
         for w in wards:
@@ -245,8 +253,6 @@ def main():
 
         scored = 0
         for lga_id, lga_wards in by_lga.items():
-            counts = [(w.population or 0) * (w.unbanked_rate or 0.0) for w in lga_wards]
-            lga_min, lga_max = (min(counts), max(counts)) if counts else (None, None)
             for w in lga_wards:
                 result = compute_boi(
                     {
@@ -256,7 +262,7 @@ def main():
                         "sim_penetration": w.sim_penetration,
                         "poverty_index": w.poverty_index,
                     },
-                    lga_min, lga_max, osm_score=None,
+                    national_min, national_max, osm_score=None,
                 )
                 row = (
                     session.query(models.WardBOI)
