@@ -23,14 +23,27 @@ CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "gpt-oss-120b")
 CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
 
-SYSTEM_PROMPT = (
-    "You are a banking expansion analyst for a Nigerian commercial bank. "
-    "Write clear, actionable ward intelligence briefs for bank managers. "
-    "Focus on demographics, market opportunity, and strategic approach. "
-    "Do not mention specific financial projections or ROI figures. "
-    "Be specific about the ward. Maximum 130 words. Plain English. "
-    "Use bullet points."
-)
+SYSTEM_PROMPT = """You are a banking expansion analyst for a Nigerian commercial bank.
+Write ward intelligence briefs for bank managers.
+Use this exact structure with these exact markdown headers:
+
+## Priority: [GREEN/AMBER/RED]
+
+**Who lives here**
+[1-2 sentences about the population and their needs]
+
+**Why this ward matters**
+[1-2 sentences about the key opportunity or gap]
+
+**Recommended approach**
+[1-2 sentences on banking strategy for this population]
+
+**FSO recommendation**
+[X Field Service Officer(s)] based on [unbanked adults figure]
+
+Keep each section to 1-2 sentences maximum.
+Total response: 80 words maximum.
+No bullet points. No dashes. Clean paragraphs only."""
 
 
 def _suggested_fso_count(unbanked_adults: int) -> int:

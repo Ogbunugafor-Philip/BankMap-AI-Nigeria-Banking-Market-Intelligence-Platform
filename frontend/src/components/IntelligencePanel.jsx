@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   MapPin, Users, UserX, Signal, CheckCircle2, Sparkles, Activity,
   Building2, Store, Landmark, Route,
@@ -11,7 +12,6 @@ import BOIRadar from './charts/BOIRadar';
 import NationalRankBar from './charts/NationalRankBar';
 import {
   formatNumber, formatPercent, formatDistance, formatConfidence,
-  getBOIColor, getProgressColor,
 } from '../utils/formatters';
 
 const PANEL = 'w-96 shrink-0 h-full bg-surface-800 border-l border-slate-700/50 overflow-y-auto';
@@ -25,22 +25,6 @@ function MetricCard({ icon: Icon, label, value }) {
         <span className="text-[10px] uppercase tracking-wide">{label}</span>
       </div>
       <span className="text-lg font-bold text-white tabular-nums">{value}</span>
-    </div>
-  );
-}
-
-function ProgressRow({ label, score }) {
-  const val = score ?? 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-slate-300">{label}</span>
-        <span className="text-xs font-bold text-white tabular-nums">{Math.round(val)}</span>
-      </div>
-      <div className="progress-bar-track">
-        <div className="progress-bar-fill"
-             style={{ width: `${Math.max(0, Math.min(100, val))}%`, backgroundColor: getProgressColor(val) }} />
-      </div>
     </div>
   );
 }
@@ -163,26 +147,6 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, wa
 
         <Divider />
 
-        {/* SECTION 6 — BOI SCORE BREAKDOWN */}
-        <h3 className="section-title">Opportunity Score Breakdown</h3>
-        <div className="text-center mb-5">
-          <div className="text-6xl font-black tabular-nums" style={{ color: getBOIColor(boi.boi_label) }}>
-            {boi.boi_score}
-          </div>
-          <div className="text-sm font-semibold tracking-wide" style={{ color: getBOIColor(boi.boi_label) }}>
-            {boi.boi_label}
-          </div>
-        </div>
-        <div className="space-y-3">
-          <ProgressRow label="Unbanked Population" score={boi.components?.unbanked_population} />
-          <ProgressRow label="Bank Absence" score={boi.components?.bank_absence} />
-          <ProgressRow label="Economic Viability" score={boi.components?.economic_viability} />
-          <ProgressRow label="Poverty Filter" score={boi.components?.poverty_filter} />
-          <ProgressRow label="Market Activity" score={boi.components?.osm_activity} />
-        </div>
-
-        <Divider />
-
         {/* SECTION 7 — EXPLAINABILITY */}
         <h3 className="section-title">Why This Score</h3>
         <ul className="space-y-2">
@@ -265,8 +229,15 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, wa
                 ? <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">Live AI</span>
                 : <span className="text-[10px] font-semibold text-slate-400 bg-slate-500/20 border border-slate-500/30 px-2 py-0.5 rounded-full">Template</span>}
             </div>
-            <div className="bg-surface-900 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 leading-relaxed not-italic whitespace-pre-line">
-              {deployment_brief}
+            <div className="bg-surface-900 border border-slate-700 rounded-xl p-4 prose prose-invert prose-sm max-w-none
+              prose-headings:text-white prose-headings:font-semibold
+              prose-headings:text-sm prose-headings:mt-3 prose-headings:mb-1
+              prose-p:text-slate-300 prose-p:leading-relaxed prose-p:my-1
+              prose-li:text-slate-300 prose-li:my-0.5
+              prose-ul:my-1 prose-ul:pl-4
+              prose-strong:text-white prose-strong:font-semibold
+              [&>*:first-child]:mt-0">
+              <ReactMarkdown>{deployment_brief}</ReactMarkdown>
             </div>
           </div>
         )}
