@@ -1,14 +1,16 @@
 import React from 'react';
 import {
   MapPin, Users, UserX, Signal, CheckCircle2, Sparkles, Activity,
-  Building2, Store, Landmark, Route, TrendingUp,
+  Building2, Store, Landmark, Route,
 } from 'lucide-react';
 import BOIBadge from './BOIBadge';
 import LoadingSpinner from './LoadingSpinner';
-import PDFExportButton from './PDFExportButton';
 import Shimmer from './Shimmer';
+import PopulationDonut from './charts/PopulationDonut';
+import BOIRadar from './charts/BOIRadar';
+import NationalRankBar from './charts/NationalRankBar';
 import {
-  formatNumber, formatNGN, formatPercent, formatDistance, formatConfidence,
+  formatNumber, formatPercent, formatDistance, formatConfidence,
   getBOIColor, getProgressColor,
 } from '../utils/formatters';
 
@@ -43,7 +45,6 @@ function ProgressRow({ label, score }) {
   );
 }
 
-// ---- STATE A: empty ----
 function EmptyState({ lgaSummary }) {
   const counts = { GREEN: 0, AMBER: 0, RED: 0 };
   (lgaSummary?.wards || []).forEach(w => { if (counts[w.boi_label] != null) counts[w.boi_label]++; });
@@ -67,7 +68,7 @@ function EmptyState({ lgaSummary }) {
   );
 }
 
-export default function IntelligencePanel({ selectedWard, osmData, briefData, lgaSummary, loading, fsoCount, roiData, onFSOChange }) {
+export default function IntelligencePanel({ selectedWard, osmData, briefData, wardScores, lgaSummary, loading }) {
   if (loading) {
     return (
       <aside className={PANEL}>
@@ -82,12 +83,12 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
   }
 
   const { ward, boi } = selectedWard;
-  const roi = roiData?.roi || selectedWard.roi;
   const unbanked = Math.round((ward.population || 0) * (ward.unbanked_rate || 0));
   const explanations = boi?.explanation
     ? ['unbanked_population', 'bank_absence', 'economic_viability', 'poverty_filter', 'osm_activity']
         .map(k => boi.explanation[k]).filter(Boolean)
     : [];
+
   // OSM + brief arrive progressively (null until their background fetch lands).
   const osm_data = osmData;
   const deployment_brief = briefData?.brief;
@@ -96,10 +97,20 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
   const osmDefault = (osm_data?.source || '').includes('default');
   const br = osm_data?.breakdown || {};
 
+  // Map the ward's stored component scores into the radar's key shape.
+  const cs = boi?.component_scores || {};
+  const wardRadar = {
+    unbanked_score: cs.unbanked_population_score,
+    bank_absence_score: cs.bank_absence_score,
+    economic_viability_score: cs.economic_viability_score,
+    poverty_filter_score: cs.poverty_filter_score,
+    osm_activity_score: cs.osm_activity_score,
+  };
+
   return (
     <aside className={`${PANEL} animate-fade-in`}>
       <div className="p-5">
-        {/* HEADER */}
+        {/* SECTION 1 — HEADER */}
         <h2 className="text-2xl font-bold text-white leading-tight">{ward.name}</h2>
         <p className="text-sm text-slate-400">{ward.lga_name} · {ward.state_name}</p>
         <div className="flex items-center gap-2 mt-3">
@@ -111,7 +122,7 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
 
         <Divider />
 
-        {/* SECTION 1 — KEY METRICS */}
+        {/* SECTION 2 — KEY METRICS */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard icon={Users} label="Population" value={formatNumber(ward.population)} />
           <MetricCard icon={UserX} label="Unbanked Adults" value={formatNumber(unbanked)} />
@@ -121,7 +132,38 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
 
         <Divider />
 
-        {/* SECTION 2 — BOI BREAKDOWN */}
+        {/* SECTION 3 — NATIONAL RANKING */}
+        <div className="glass-card p-4 rounded-xl">
+          <NationalRankBar
+            boi_score={boi.boi_score} boi_label={boi.boi_label}
+            ward_name={ward.name} state_name={ward.state_name} />
+        </div>
+
+        <Divider />
+
+        {/* SECTION 4 — POPULATION DONUT */}
+        <div className="glass-card p-4 rounded-xl">
+          <PopulationDonut population={ward.population} unbankedRate={ward.unbanked_rate} />
+        </div>
+
+        <Divider />
+
+        {/* SECTION 5 — BOI COMPONENT RADAR */}
+        <div className="glass-card p-4 rounded-xl">
+          {!wardScores ? (
+            <>
+              <h3 className="section-title mb-0">BOI Component Analysis</h3>
+              <p className="text-xs text-slate-500 mb-2">vs LGA average</p>
+              <Shimmer height="h-44" />
+            </>
+          ) : (
+            <BOIRadar wardScores={wardRadar} lgaAverages={wardScores.lga_averages} wardName={ward.name} />
+          )}
+        </div>
+
+        <Divider />
+
+        {/* SECTION 6 — BOI SCORE BREAKDOWN */}
         <h3 className="section-title">Opportunity Score Breakdown</h3>
         <div className="text-center mb-5">
           <div className="text-6xl font-black tabular-nums" style={{ color: getBOIColor(boi.boi_label) }}>
@@ -141,7 +183,7 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
 
         <Divider />
 
-        {/* SECTION 3 — EXPLAINABILITY */}
+        {/* SECTION 7 — EXPLAINABILITY */}
         <h3 className="section-title">Why This Score</h3>
         <ul className="space-y-2">
           {explanations.map((text, i) => (
@@ -154,7 +196,7 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
 
         <Divider />
 
-        {/* SECTION 4 — OSM MARKET DATA */}
+        {/* SECTION 8 — OSM MARKET DATA */}
         <h3 className="section-title">Live Market Intelligence</h3>
         {!osm_data ? (
           <div className="glass-card p-4">
@@ -199,7 +241,7 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
 
         <Divider />
 
-        {/* SECTION 5 — AI DEPLOYMENT BRIEF */}
+        {/* SECTION 9 — AI DEPLOYMENT BRIEF */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="section-title mb-0">AI Deployment Brief</h3>
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 rounded-full">
@@ -228,67 +270,6 @@ export default function IntelligencePanel({ selectedWard, osmData, briefData, lg
             </div>
           </div>
         )}
-
-        <Divider />
-
-        {/* SECTION 6 — FSO SIMULATOR */}
-        <h3 className="section-title">FSO Deployment Simulator</h3>
-        <p className="text-xs text-slate-400 -mt-2 mb-3">Adjust FSO count to model outcomes</p>
-        <div className="text-center mb-3">
-          <span className="text-3xl font-black text-white">{fsoCount}</span>
-          <span className="text-sm text-slate-400 ml-1">FSO{fsoCount > 1 ? 's' : ''}</span>
-        </div>
-        <input
-          type="range" min="1" max="4" step="1" value={fsoCount}
-          onChange={(e) => onFSOChange(Number(e.target.value))}
-          className="w-full accent-brand-500 cursor-pointer"
-        />
-        <div className="flex justify-between text-[10px] text-slate-500 mt-1 px-0.5">
-          {[1, 2, 3, 4].map(n => <span key={n}>{n}</span>)}
-        </div>
-        <div className="text-center mt-4 glass-card py-3">
-          <span className="text-2xl font-black text-brand-500">~{roi?.monthly_accounts ?? '—'}</span>
-          <span className="text-sm text-slate-300 block">new accounts / month</span>
-        </div>
-
-        <Divider />
-
-        {/* SECTION 7 — ROI PROJECTION */}
-        <h3 className="section-title">Financial Projection</h3>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <MetricCard icon={TrendingUp} label="Acquisition Cost" value={formatNGN(roi?.acquisition_cost)} />
-          <MetricCard icon={TrendingUp} label="Expected Deposits" value={formatNGN(roi?.expected_deposits)} />
-          <MetricCard icon={TrendingUp} label="Yearly Revenue" value={formatNGN(roi?.yearly_revenue)} />
-          <MetricCard icon={TrendingUp} label="Payback Period" value={roi?.payback_months ? `${roi.payback_months} mo` : '>10 yr'} />
-        </div>
-
-        <div className="overflow-hidden rounded-lg border border-slate-700/50">
-          <table className="w-full text-xs font-mono">
-            <thead>
-              <tr className="bg-surface-700 text-slate-400">
-                <th className="text-left p-2 font-medium">FSOs</th>
-                <th className="text-right p-2 font-medium">Accts</th>
-                <th className="text-right p-2 font-medium">Yr Rev</th>
-                <th className="text-right p-2 font-medium">Payback</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(roi?.what_if || []).map(w => (
-                <tr key={w.fso_count}
-                    className={`border-t border-slate-700/50 ${w.fso_count === fsoCount ? 'bg-brand-700/20 ring-1 ring-inset ring-brand-500/40' : ''}`}>
-                  <td className="p-2 text-slate-200">{w.fso_count}</td>
-                  <td className="p-2 text-right text-slate-200">{w.monthly_accounts}</td>
-                  <td className="p-2 text-right text-slate-200">{formatNGN(w.yearly_revenue)}</td>
-                  <td className="p-2 text-right text-slate-200">{w.payback_months ? `${w.payback_months}mo` : '>10y'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-5">
-          <PDFExportButton wardId={ward.id} wardName={ward.name} lgaName={ward.lga_name} />
-        </div>
       </div>
     </aside>
   );

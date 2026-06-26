@@ -196,19 +196,14 @@ def ward_intelligence(ward_id: int, db: Session = Depends(get_db)):
     osm = get_osm_activity(lat, lon, timeout=8)
     boi = compute_boi(wd, national_min, national_max, osm_score=osm["score"])
 
-    # ROI for 2 FSOs (+ what-if 1–4), informed by the live BOI.
-    roi_input = dict(wd, boi_score=boi.boi_score)
-    roi = compute_roi_with_whatif(roi_input, fso_count=2, max_fso=4)
-
-    # AI deployment brief from real data.
-    brief = generate_deployment_brief(wd, boi.as_dict(), roi, timeout=15)
+    # AI deployment brief from real demographics (no ROI).
+    brief = generate_deployment_brief(wd, boi.as_dict(), timeout=15)
 
     return {
         "ward": wd,
         "centroid": {"latitude": lat, "longitude": lon},
         "boi": boi.as_dict(),
         "osm_data": osm,
-        "roi": roi,
         "deployment_brief": brief["brief"],
         "deployment_brief_source": brief["source"],
     }
@@ -256,13 +251,9 @@ def ward_intelligence_base(ward_id: int, db: Session = Depends(get_db)):
         "explanation": stored.explanation if stored else {},
     }
 
-    roi_input = dict(wd, boi_score=(stored.boi_score if stored else 50))
-    roi = compute_roi_with_whatif(roi_input, fso_count=2, max_fso=4)
-
     return {
         "ward": wd,
         "boi": boi,
-        "roi": roi,
         "data_confidence": stored.data_confidence if stored else None,
     }
 
@@ -284,12 +275,8 @@ def ward_osm(ward_id: int, db: Session = Depends(get_db)):
 # GET /wards/{ward_id}/brief   (Cerebras only)
 # --------------------------------------------------------------------------
 @router.get("/wards/{ward_id}/brief")
-def ward_brief(
-    ward_id: int,
-    fso_count: int = Query(2, ge=1, le=10),
-    db: Session = Depends(get_db),
-):
-    """Cerebras deployment brief only, for a given FSO count (timeout 20s)."""
+def ward_brief(ward_id: int, db: Session = Depends(get_db)):
+    """Cerebras ward-intelligence brief only (timeout 20s) — no ROI."""
     ward = db.get(models.Ward, ward_id)
     if ward is None:
         raise HTTPException(status_code=404, detail="Ward not found")
@@ -301,11 +288,9 @@ def ward_brief(
         "boi_label": stored.boi_label if stored else None,
         "data_confidence": stored.data_confidence if stored else None,
     }
-    roi = compute_roi(dict(wd, boi_score=(stored.boi_score if stored else 50)), fso_count)
-    brief = generate_deployment_brief(wd, boi, roi, timeout=20)
+    brief = generate_deployment_brief(wd, boi, timeout=20)
     return {
         "ward_id": ward_id,
-        "fso_count": fso_count,
         "brief": brief["brief"],
         "source": brief["source"],
         "model": brief.get("model"),
@@ -408,3 +393,55 @@ def lga_intelligence_summary(lga_id: int, db: Session = Depends(get_db)):
         "summary": summary,
         "wards": wards,
     }
+
+
+# --------------------------------------------------------------------------
+# GET /lgas/{lga_id}/ward-scores   (BOI component scores for charts)
+# --------------------------------------------------------------------------
+@router.get("/lgas/{lga_id}/ward-scores")
+def lga_ward_scores(lga_id: int, db: Session = Depends(get_db)):
+    """
+    BOI component scores for every ward in the LGA plus LGA-average components,
+    used by the comparison radar chart.
+    """
+    lga = db.get(models.LGA, lga_id)
+    if lga is None:
+        raise HTTPException(status_code=404, detail="LGA not found")
+
+    rows = (
+        db.query(models.Ward, models.WardBOI)
+        .join(models.WardBOI, models.WardBOI.ward_id == models.Ward.id)
+        .filter(models.Ward.lga_id == lga_id)
+        .order_by(models.WardBOI.boi_score.desc().nullslast())
+        .all()
+    )
+
+    wards, acc = [], {
+        "boi_score": [], "unbanked_score": [], "bank_absence_score": [],
+        "economic_viability_score": [], "poverty_filter_score": [], "osm_activity_score": [],
+    }
+    for ward, b in rows:
+        wards.append({
+            "ward_name": ward.name,
+            "boi_score": b.boi_score,
+            "unbanked_score": round(b.unbanked_population_score or 0, 1),
+            "bank_absence_score": round(b.bank_absence_score or 0, 1),
+            "economic_viability_score": round(b.economic_viability_score or 0, 1),
+            "poverty_filter_score": round(b.poverty_filter_score or 0, 1),
+            "osm_activity_score": round(b.osm_activity_score or 0, 1),
+            "population": ward.population,
+            "unbanked_rate": ward.unbanked_rate,
+            "boi_label": b.boi_label,
+        })
+        acc["boi_score"].append(b.boi_score or 0)
+        acc["unbanked_score"].append(b.unbanked_population_score or 0)
+        acc["bank_absence_score"].append(b.bank_absence_score or 0)
+        acc["economic_viability_score"].append(b.economic_viability_score or 0)
+        acc["poverty_filter_score"].append(b.poverty_filter_score or 0)
+        acc["osm_activity_score"].append(b.osm_activity_score or 0)
+
+    def avg(vals):
+        return round(sum(vals) / len(vals)) if vals else 0
+
+    lga_averages = {k: avg(v) for k, v in acc.items()}
+    return {"lga_name": lga.name, "wards": wards, "lga_averages": lga_averages}

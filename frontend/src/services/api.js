@@ -65,7 +65,11 @@ export const getWardBase = (wardId) =>
   api.get(`/wards/${wardId}/intelligence/base`).then(r => r.data);
 export const getWardOSM = (wardId) =>
   api.get(`/wards/${wardId}/osm`).then(r => r.data);
-export const getWardBrief = (wardId, fsoCount = 2) =>
-  api.get(`/wards/${wardId}/brief?fso_count=${fsoCount}`).then(r => r.data);
+export const getWardBrief = (wardId) =>
+  api.get(`/wards/${wardId}/brief`).then(r => r.data);
+
+// BOI component scores for all wards in an LGA (radar comparison chart).
+export const getLGAWardScores = (lgaId) =>
+  api.get(`/lgas/${lgaId}/ward-scores`).then(r => r.data);
 
 export default api;

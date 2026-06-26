@@ -5,8 +5,8 @@ import Sidebar from '../components/Sidebar';
 import MapPanel from '../components/MapPanel';
 import IntelligencePanel from '../components/IntelligencePanel';
 import {
-  getStates, getLGAs, getLGASummary, getWardROI,
-  getWardBase, getWardOSM, getWardBrief,
+  getStates, getLGAs, getLGASummary,
+  getWardBase, getWardOSM, getWardBrief, getLGAWardScores,
   getUser, clearAuth,
 } from '../services/api';
 
@@ -23,9 +23,8 @@ export default function Dashboard() {
   const [selectedWard, setSelectedWard] = useState(null);  // base data (instant)
   const [osmData, setOsmData] = useState(null);            // stage 2 (background)
   const [briefData, setBriefData] = useState(null);        // stage 3 (background)
-  const [fsoCount, setFsoCount] = useState(2);
-  const [roiData, setRoiData] = useState(null);
-  const [loading, setLoading] = useState({ states: false, lgas: false, map: false, ward: false, roi: false });
+  const [wardScores, setWardScores] = useState(null);      // LGA ward scores (radar)
+  const [loading, setLoading] = useState({ states: false, lgas: false, map: false, ward: false });
 
   const setFlag = (key, val) => setLoading(prev => ({ ...prev, [key]: val }));
 
@@ -38,22 +37,16 @@ export default function Dashboard() {
     if (!selectedState) { setLGAs([]); return; }
     setFlag('lgas', true);
     setLGAs([]); setSelectedLGA(null); setLgaSummary(null);
-    setSelectedWardId(null); setSelectedWard(null); setRoiData(null);
+    setSelectedWardId(null); setSelectedWard(null); setWardScores(null);
     getLGAs(selectedState.id).then(setLGAs).catch(() => setLGAs([])).finally(() => setFlag('lgas', false));
   }, [selectedState]);
 
   useEffect(() => {
     if (!selectedLGA) { setLgaSummary(null); return; }
     setFlag('map', true);
-    setSelectedWardId(null); setSelectedWard(null); setRoiData(null);
+    setSelectedWardId(null); setSelectedWard(null); setWardScores(null);
     getLGASummary(selectedLGA.id).then(setLgaSummary).catch(() => setLgaSummary(null)).finally(() => setFlag('map', false));
   }, [selectedLGA]);
-
-  useEffect(() => {
-    if (!selectedWardId) { setRoiData(null); return; }
-    setFlag('roi', true);
-    getWardROI(selectedWardId, fsoCount).then(setRoiData).catch(() => {}).finally(() => setFlag('roi', false));
-  }, [selectedWardId, fsoCount]);
 
   const handleStateSelect = useCallback((state) => { setSelectedState(state); }, []);
   const handleLGASelect = useCallback((lga) => { setSelectedLGA(lga); }, []);
@@ -62,8 +55,7 @@ export default function Dashboard() {
     setSelectedWard(null);
     setOsmData(null);
     setBriefData(null);
-    setRoiData(null);
-    setFsoCount(2);
+    setWardScores(null);
     setFlag('ward', true);
 
     // Stage 1: instant base data.
@@ -71,25 +63,17 @@ export default function Dashboard() {
       .then((base) => {
         setSelectedWard(base);
         setFlag('ward', false);
-        // Stages 2 & 3: OSM + AI brief load in the background.
+        // Background: OSM, AI brief, and LGA ward-scores (for the radar chart).
         getWardOSM(wardId).then(setOsmData).catch(() =>
           setOsmData({ score: 50, total_nodes: null, breakdown: {}, source: 'default (error)' }));
-        getWardBrief(wardId, 2).then(setBriefData).catch(() =>
+        getWardBrief(wardId).then(setBriefData).catch(() =>
           setBriefData({ brief: 'Brief unavailable.', source: 'error' }));
+        if (base?.ward?.lga_id) {
+          getLGAWardScores(base.ward.lga_id).then(setWardScores).catch(() => setWardScores(null));
+        }
       })
       .catch(() => { setSelectedWard(null); setFlag('ward', false); });
   }, []);
-
-  // FSO slider change -> only the brief needs regenerating (ROI is handled by the
-  // effect above; both show a shimmer while refetching).
-  const handleFSOChange = useCallback((count) => {
-    setFsoCount(count);
-    if (selectedWardId) {
-      setBriefData(null);
-      getWardBrief(selectedWardId, count).then(setBriefData).catch(() =>
-        setBriefData({ brief: 'Brief unavailable.', source: 'error' }));
-    }
-  }, [selectedWardId]);
 
   const handleSignOut = () => { clearAuth(); navigate('/'); };
 
@@ -144,11 +128,9 @@ export default function Dashboard() {
           selectedWard={selectedWard}
           osmData={osmData}
           briefData={briefData}
+          wardScores={wardScores}
           lgaSummary={lgaSummary}
           loading={loading.ward}
-          fsoCount={fsoCount}
-          roiData={roiData}
-          onFSOChange={handleFSOChange}
         />
       </div>
     </div>

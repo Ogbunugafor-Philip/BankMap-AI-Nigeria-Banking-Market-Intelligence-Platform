@@ -74,39 +74,35 @@ def _safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "_", (name or "ward")).strip("_") or "ward"
 
 
+def _benchmark(score):
+    """High/Medium/Low badge for a component score."""
+    s = score or 0
+    if s >= 70:
+        return '<span class="badge b-high">High</span>'
+    if s >= 40:
+        return '<span class="badge b-med">Medium</span>'
+    return '<span class="badge b-low">Low</span>'
+
+
 def _build_html(intel: dict) -> str:
     ward = intel["ward"]
     boi = intel["boi"]
-    roi = intel["roi"]
 
     pop = ward.get("population") or 0
-    unbanked = int(pop * (ward.get("unbanked_rate") or 0))
+    rate = ward.get("unbanked_rate") or 0
+    unbanked = int(pop * rate)
+    banked = max(0, pop - unbanked)
     label = boi.get("boi_label") or "RED"
 
-    # BOI breakdown bars
-    bars = []
+    # BOI component score rows (Component | Score | Benchmark).
     comps = boi.get("components", {})
+    comp_rows = []
     for key, text in _BAR_LABELS:
-        val = comps.get(key)
-        val = 0 if val is None else val
-        bars.append(
-            f'<div class="bar-row"><div class="bar-label">{text}</div>'
-            f'<div class="bar-track"><div class="bar-fill" style="width:{val:.0f}%;'
-            f'background:{_progress_color(val)};"></div></div>'
-            f'<div class="bar-val">{val:.0f}</div></div>'
+        val = comps.get(key) or 0
+        comp_rows.append(
+            f"<tr><td>{text}</td><td>{val:.0f}/100</td><td>{_benchmark(val)}</td></tr>"
         )
 
-    # What-if rows
-    rows = []
-    for w in roi.get("what_if", []):
-        active = " class=\"active\"" if w["fso_count"] == roi.get("fso_count") else ""
-        payback = f"{w['payback_months']} mo" if w.get("payback_months") else ">10 yr"
-        rows.append(
-            f"<tr{active}><td>{w['fso_count']}</td><td>{w['monthly_accounts']}</td>"
-            f"<td>{_ngn(w['yearly_revenue'])}</td><td>{payback}</td></tr>"
-        )
-
-    payback = f"{roi.get('payback_months')} months" if roi.get("payback_months") else ">10 years"
     brief_source = intel.get("deployment_brief_source", "")
     brief_tag = "Live AI (Cerebras)" if brief_source.startswith("cerebras") else "Template"
 
@@ -124,18 +120,14 @@ def _build_html(intel: dict) -> str:
         "__CONFIDENCE__": _pct(boi.get("data_confidence")),
         "__POPULATION__": _num(pop),
         "__UNBANKED__": _num(unbanked),
+        "__BANKED__": _num(banked),
+        "__UNBANKED_RATE__": _pct(rate),
         "__DISTANCE__": _dist(ward.get("nearest_bank_distance_km")),
         "__SIM__": _pct(ward.get("sim_penetration")),
-        "__BOI_BARS__": "\n".join(bars),
+        "__COMPONENT_ROWS__": "\n".join(comp_rows),
         "__BRIEF_SOURCE__": brief_tag,
         # Strip markdown bold/italic markers so the brief renders cleanly in print.
         "__BRIEF__": (intel.get("deployment_brief") or "").replace("**", "").replace("*", "").strip(),
-        "__FSO_COUNT__": str(roi.get("fso_count", 2)),
-        "__ACQ_COST__": _ngn(roi.get("acquisition_cost")),
-        "__DEPOSITS__": _ngn(roi.get("expected_deposits")),
-        "__REVENUE__": _ngn(roi.get("yearly_revenue")),
-        "__PAYBACK__": payback,
-        "__WHATIF_ROWS__": "\n".join(rows),
     }
     for token, value in replacements.items():
         html = html.replace(token, str(value))
