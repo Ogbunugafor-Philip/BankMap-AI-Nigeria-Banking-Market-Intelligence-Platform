@@ -1,132 +1,190 @@
 # BankMap AI — Nigeria Banking Market Intelligence Platform
 
-![BankMap AI](https://img.shields.io/badge/BankMap-AI-0ea5e9?style=for-the-badge)
-![Nigeria](https://img.shields.io/badge/Nigeria-37%20States-green?style=for-the-badge)
-![Wards](https://img.shields.io/badge/Wards-9%2C308-blue?style=for-the-badge)
-![Live](https://img.shields.io/badge/Live-aibankmap.space-success?style=for-the-badge)
+A ward-level banking opportunity intelligence platform covering all
+9,308 wards across Nigeria's 36 states and FCT. Built to demonstrate
+production-grade spatial data engineering, AI integration, and
+full-stack deployment skills.
 
-## Live Demo
-**[https://aibankmap.space](https://aibankmap.space)**
-
-Demo credentials:
-- Email: philiposita1041@gmail.com
-- Password: Osita@1989
-
-## What It Does
-BankMap AI gives Nigerian bank managers instant ward-level market
-intelligence across all 774 LGAs and 9,308 wards in Nigeria —
-with zero manual data input.
-
-A manager selects a State and LGA. The system returns:
-- Banking Opportunity Index (BOI) score for every ward (0–100)
-- GREEN / AMBER / RED deployment labels
-- AI-generated deployment brief (Cerebras gpt-oss-120b)
-- FSO count simulator with ROI projection
-- PDF export for presentations
-
-## The Problem It Solves
-Nigerian bank managers deploy Field Sales Officers (FSOs) based on
-intuition rather than data. High-potential unbanked zones are
-consistently missed in favor of already-penetrated urban areas.
-No affordable ward-level intelligence tool existed for Nigerian
-banking expansion — until now.
-
-## Data Sources (All Real, All Public)
-| Dataset | Source | Coverage |
-|---------|--------|----------|
-| Ward Boundaries | GRID3 / INEC Operational Wards v1.0 | 9,308 wards |
-| Population | WorldPop 2020 UN-adjusted | All wards |
-| Financial Inclusion | EFInA Access to Finance Survey 2020 | 37 states |
-| Bank Branches | CBN / OpenStreetMap | 891 branches |
-| Poverty Index | NBS Multidimensional Poverty Index 2022 | All LGAs |
-| SIM Penetration | NCC / DHS-MICS 2021 | 37 states |
-| Live Market Data | OpenStreetMap Overpass API | Real-time |
-
-## Banking Opportunity Index (BOI)
-Five-component weighted score:
-- Unbanked Population (30%) — adults without bank accounts
-- Bank Absence (25%) — distance to nearest branch
-- Economic Viability (20%) — SIM penetration proxy
-- Poverty Filter (15%) — MPI sweet spot targeting
-- Live Market Activity (10%) — OpenStreetMap real-time data
-
-## Tech Stack
-| Layer | Technology |
-|-------|-----------|
-| Backend | FastAPI (Python) |
-| Database | PostgreSQL + PostGIS |
-| Spatial Data | GeoAlchemy2, GeoPandas |
-| Map Engine | Leaflet.js + GRID3 Shapefiles |
-| AI Narrative | Cerebras gpt-oss-120b |
-| Frontend | React 19 + Tailwind CSS |
-| PDF Export | WeasyPrint |
-| Deployment | Nginx + systemd + Contabo VPS |
-
-## API Endpoints
-| Endpoint | Description |
-|----------|-------------|
-| GET /states | All 37 states |
-| GET /states/{id}/lgas | LGAs in a state |
-| GET /lgas/{id}/intelligence/summary | Fast map render |
-| GET /lgas/{id}/intelligence | Full LGA intelligence |
-| GET /wards/{id}/intelligence | Single ward full report |
-| GET /wards/{id}/roi?fso_count=2 | ROI calculator |
-| POST /wards/{id}/export-pdf | PDF report export |
-| POST /auth/login | Demo authentication |
-
-## Local Setup
-```bash
-# Clone
-git clone https://github.com/Ogbunugafor-Philip/BankMap-AI-Nigeria-Banking-Market-Intelligence-Platform.git
-cd BankMap-AI-Nigeria-Banking-Market-Intelligence-Platform
-
-# Backend
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Database (requires PostgreSQL + PostGIS)
-createdb bankmap
-psql -d bankmap -c "CREATE EXTENSION postgis;"
-
-# Configure
-cp .env.example .env
-# Edit .env with your database credentials and Cerebras API key
-
-# Start
-uvicorn main:app --reload --port 8001
-```
-
-## Project Structure
-```
-bankmap-ai/
-├── backend/
-│   ├── main.py              # FastAPI app
-│   ├── models.py            # SQLAlchemy models
-│   ├── boi_engine.py        # BOI scoring algorithm
-│   ├── cerebras_service.py  # AI brief generation
-│   ├── osm_service.py       # OpenStreetMap integration
-│   ├── roi_calculator.py    # Financial projections
-│   ├── routers/             # API route handlers
-│   └── scripts/             # Data loading scripts
-└── frontend/
-    ├── src/
-    │   ├── pages/           # Login, Landing, Dashboard
-    │   ├── components/      # Map, Intelligence panel, etc
-    │   └── services/        # API client
-    └── public/
-```
-
-## Author
-**Philip Ogbunugafor**
-Built as a flagship portfolio project demonstrating:
-- Spatial data engineering (PostGIS, GeoJSON, shapefiles)
-- Real Nigerian government dataset integration
-- AI-powered narrative generation (Cerebras)
-- Full-stack React + FastAPI production deployment
+**Live platform:** https://aibankmap.space
+**Stack:** FastAPI · PostgreSQL/PostGIS · React 19 · Leaflet.js · Cerebras AI · nginx
 
 ---
-*BankMap AI is a decision-support tool. All estimates are
-model-derived from public data and should be validated
-with ground-level reconnaissance before FSO deployment.*
+
+## What It Does
+
+BankMap AI computes a Banking Opportunity Index (BOI) for every ward
+in Nigeria and surfaces that intelligence through an interactive map
+with AI-generated deployment briefs.
+
+A user selects any ward on the map and immediately sees:
+
+- **BOI score** (0–100) with GREEN / AMBER / RED tier classification
+- **National rank** — exact position among all 9,308 wards
+- **Population breakdown** — total residents vs estimated unbanked adults
+- **Access gap** — distance to nearest bank branch
+- **BOI component radar** — ward vs LGA average across 5 dimensions
+- **AI deployment brief** — ward-specific, jargon-free recommendation
+  generated by Cerebras AI (gpt-oss-120b)
+- **Data confidence score** — honest indicator of input data quality
+
+---
+
+## Banking Opportunity Index (BOI)
+
+The BOI is a composite score computed for all 9,308 wards using
+five weighted components:
+
+| Component | Weight | Source |
+|---|---|---|
+| Unbanked adult population | 35% | EFInA A2F 2020 + WorldPop 2020 |
+| Distance to nearest bank branch | 20% | OpenStreetMap + CBN |
+| Economic activity proxy (SIM penetration) | 15% | NCC / DHS-MICS |
+| Poverty index (moderate poverty = opportunity) | 10% | NBS MPI 2022 |
+| Market size (ward population) | 20% | WorldPop 2020 |
+
+**Normalization:** 5th–95th percentile national range (1,657–34,025
+unbanked adults), preventing outlier collapse and producing a
+meaningful national distribution.
+
+**Tier distribution:** 1,251 GREEN · 7,106 AMBER · 951 RED
+
+---
+
+## Data Sources
+
+| Dataset | Granularity | Vintage | Source |
+|---|---|---|---|
+| Ward boundaries | Ward (9,308) | 2020 | GRID3 / INEC v1.0 |
+| Population | Ward | 2020 | WorldPop raster zonal stats |
+| Unbanked rate | State (37) → Ward | 2020 | EFInA Access to Finance Survey |
+| Poverty index | State / LGA | 2022 | NBS Multidimensional Poverty Index |
+| SIM penetration | State / Zone | 2023 | NCC / DHS-MICS |
+| Bank branches | Point | 2024 | OpenStreetMap + CBN registry |
+
+### Methodology Note
+
+Ward-level unbanked figures are **modelled estimates**, not direct
+measurements. The EFInA A2F survey is conducted at state level
+(~600 respondents per state). Ward-level rates are disaggregated
+from state averages using three ward-level proxy variables:
+distance to nearest bank branch (weight 50%), NBS MPI poverty
+index (30%), and SIM penetration (20%), with population-weighted
+scaling to preserve the state mean.
+
+A LGA-level upgrade is in progress pending receipt of EFInA A2F
+2023 microdata (requested March 2024), which will provide ~774
+LGA-level exclusion rates computed from individual respondent data.
+
+Data confidence scores (shown per ward) reflect input data quality:
+- 0.8–0.9: geometry + population from primary sources
+- 0.5–0.7: socioeconomic variables from state/zone averages
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                   nginx (SSL)                   │
+│         aibankmap.space · Let's Encrypt         │
+└────────────┬───────────────────┬────────────────┘
+             │                   │
+    ┌────────▼────────┐ ┌────────▼───────┐
+    │   React 19 SPA  │ │  FastAPI :8001 │
+    │   Leaflet.js    │ │  (localhost)   │
+    │   Recharts      │ │                │
+    │   Tailwind CSS  │ │  Routers:      │
+    └─────────────────┘ │  /states /lgas │
+                        │  /wards        │
+                        │  /intelligence │
+                        │  /pdf-export   │
+                        └───────┬────────┘
+                                │
+                    ┌───────────▼──────────┐
+                    │  PostgreSQL/PostGIS   │
+                    │  37 states            │
+                    │  774 LGAs             │
+                    │  9,308 wards + BOI    │
+                    └───────────┬──────────┘
+                                │
+                  ┌─────────────▼───────────────────┐
+                  │           External APIs         │
+                  │  Cerebras AI  ·  OSM Overpass   │
+                  └─────────────────────────────────┘
+```
+
+**Infrastructure:** Contabo VPS · Ubuntu 24 · systemd · WeasyPrint PDF export
+
+---
+
+## Key Engineering Decisions
+
+**BOI normalization:** LGA-scoped normalization caused every top ward
+in any LGA to score 100 (meaningless comparisons). National absolute
+max collapsed the GREEN tier to near-zero. The correct approach is
+5th–95th percentile clipping, producing a meaningful national
+distribution while handling outliers.
+
+**Progressive loading:** Base ward data loads in ~200ms. OSM queries
+and Cerebras AI load asynchronously with shimmer placeholders so
+the map remains responsive.
+
+**AI as writer, not calculator:** The Cerebras prompt receives all
+pre-computed figures explicitly and is instructed not to recalculate.
+Early versions where the model received raw inputs produced incorrect
+financial figures — the fix was treating the model as a prose writer
+operating on verified numbers.
+
+**Honest confidence scoring:** Each ward carries a data_confidence
+field (0–1) computed from the quality of its input sources. This is
+surfaced in the UI so analysts know which wards to validate before
+acting on.
+
+---
+
+## Running Locally
+
+```bash
+# Backend
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+
+# Frontend
+cd frontend
+npm install
+npm start
+```
+
+Requires: PostgreSQL 15+ with PostGIS, Python 3.11+, Node 18+.
+Database setup scripts are in `backend/scripts/`.
+
+---
+
+## Project Status
+
+| Feature | Status |
+|---|---|
+| Ward boundaries (all 37 states) | ✅ Complete |
+| BOI computation (9,308 wards) | ✅ Complete |
+| Interactive map + intelligence panel | ✅ Complete |
+| Cerebras AI deployment briefs | ✅ Complete |
+| PDF export | ✅ Complete |
+| JWT authentication | ✅ Complete |
+| SSL + production deployment | ✅ Complete |
+| EFInA A2F 2023 LGA microdata | ⏳ Requested — pipeline ready |
+| OSM agent banking density | ⏳ Schema ready — Overpass rate limits |
+
+---
+
+## Author
+
+**Philip Ogbunugafor**
+Spatial Data Engineer · Full-Stack Developer · AI Integration
+
+Built as a flagship portfolio project demonstrating:
+- Spatial data engineering with PostGIS
+- Real public dataset integration (6 sources)
+- Production FastAPI + React deployment
+- AI-augmented analytics with Cerebras
