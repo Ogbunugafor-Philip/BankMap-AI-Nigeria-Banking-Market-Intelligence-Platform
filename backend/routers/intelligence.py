@@ -43,9 +43,20 @@ def _ward_data(db: Session, ward: models.Ward) -> dict:
         "state_name": state.name if state else None,
         "population": ward.population,
         "unbanked_rate": ward.unbanked_rate,
+        "unbanked_rate_source": ward.unbanked_rate_source,
         "nearest_bank_distance_km": ward.nearest_bank_distance_km,
         "sim_penetration": ward.sim_penetration,
         "poverty_index": ward.poverty_index,
+        # Ground-level reality indicators — NULL until the PHASE 1–3 loaders
+        # (INEC voter, OSM agents, EFInA microdata) run. The panel hides any
+        # field that is None.
+        "registered_voters": ward.registered_voters,
+        "voter_density": ward.voter_density,
+        "civic_participation_ratio": ward.civic_participation_ratio,
+        "mobile_money_agents": ward.mobile_money_agents,
+        "pos_terminals": ward.pos_terminals,
+        "agent_density_per_1000": ward.agent_density_per_1000,
+        "osm_agent_queried": ward.osm_agent_queried,
     }
 
 
@@ -73,6 +84,56 @@ def _national_unbanked_range(db: Session):
         else:
             _NATIONAL_RANGE = (0.0, 1.0)
     return _NATIONAL_RANGE
+
+
+_TOTAL_WARDS = None  # cached count of all wards (changes only on data reload)
+
+
+def _total_wards(db: Session) -> int:
+    global _TOTAL_WARDS
+    if _TOTAL_WARDS is None:
+        _TOTAL_WARDS = db.query(func.count(models.Ward.id)).scalar() or 0
+    return _TOTAL_WARDS
+
+
+def _national_ranks(db: Session, ward: models.Ward) -> dict:
+    """
+    Exact national ranks computed on the fly — there are no stored rank columns.
+    Unbanked-adult counts are not stored, so we rank on (population * unbanked_rate);
+    BOI lives in ward_boi, so we rank on its boi_score. Rank N = (wards strictly
+    higher) + 1. Two indexed-free COUNT scans over ~9k rows — only called on the
+    single-ward detail endpoints, never in the LGA loop.
+    """
+    total = _total_wards(db)
+
+    this_unbanked = (ward.population or 0) * (ward.unbanked_rate or 0)
+    wards_with_more_unbanked = (
+        db.query(func.count(models.Ward.id))
+        .filter((models.Ward.population * models.Ward.unbanked_rate) > this_unbanked)
+        .scalar()
+    ) or 0
+
+    this_boi = (
+        db.query(models.WardBOI.boi_score)
+        .filter(models.WardBOI.ward_id == ward.id)
+        .scalar()
+    )
+    if this_boi is not None:
+        wards_with_higher_boi = (
+            db.query(func.count(models.WardBOI.ward_id))
+            .filter(models.WardBOI.boi_score > this_boi)
+            .scalar()
+        ) or 0
+        national_boi_rank = wards_with_higher_boi + 1
+    else:
+        national_boi_rank = None
+
+    return {
+        "national_unbanked_rank": wards_with_more_unbanked + 1,
+        "wards_with_more_unbanked": wards_with_more_unbanked,
+        "national_boi_rank": national_boi_rank,
+        "total_wards": total,
+    }
 
 
 def _centroid(db: Session, ward: models.Ward):
@@ -188,6 +249,7 @@ def ward_intelligence(ward_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ward not found")
 
     wd = _ward_data(db, ward)
+    wd.update(_national_ranks(db, ward))
     national_min, national_max = _national_unbanked_range(db)
     lat, lon = _centroid(db, ward)
 
@@ -225,6 +287,7 @@ def ward_intelligence_base(ward_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ward not found")
 
     wd = _ward_data(db, ward)
+    wd.update(_national_ranks(db, ward))
     stored = db.query(models.WardBOI).filter(models.WardBOI.ward_id == ward_id).one_or_none()
 
     component_scores = {

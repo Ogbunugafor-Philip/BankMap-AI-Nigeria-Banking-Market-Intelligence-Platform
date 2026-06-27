@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, MapPin, Users, Database } from 'lucide-react';
+import { BarChart3, MapPin, Users, Database, Code2 } from 'lucide-react';
+
+const GITHUB_URL = 'https://github.com/Ogbunugafor-Philip/BankMap-AI-Nigeria-Banking-Market-Intelligence-Platform';
 
 const STATS = [
   ['9,308', 'Wards Mapped'],
   ['774', 'LGAs Covered'],
   ['37', 'States'],
-  ['100%', 'Real Data'],
+  ['6', 'Open Datasets'],
 ];
 
 const STEPS = [
@@ -19,12 +21,12 @@ const STEPS = [
 ];
 
 const SOURCES = [
-  ['GRID3', 'Ward Boundaries', '9,308 ward boundary polygons'],
-  ['EFInA', 'Financial Inclusion', 'A2F Survey — banked vs unbanked rates'],
-  ['CBN', 'Bank Branches', '891 licensed branch locations'],
-  ['NBS', 'Poverty Index', 'Multidimensional Poverty Index by LGA'],
-  ['NCC', 'SIM Penetration', 'Mobile subscriber data by state'],
-  ['OpenStreetMap', 'Live Markets', 'Real-time economic activity data'],
+  ['WorldPop 2020', 'Population', 'Raster zonal statistics per ward boundary'],
+  ['EFInA A2F 2020', 'Unbanked Rate', 'State-level survey, disaggregated to wards by proxy'],
+  ['NBS MPI 2022', 'Poverty Index', 'Multidimensional Poverty Index'],
+  ['GRID3 / INEC', 'Ward Boundaries', '9,308 operational boundary polygons (v1.0)'],
+  ['OpenStreetMap + CBN', 'Bank Branches', 'OSM features plus CBN licensed institutions'],
+  ['NCC / DHS-MICS', 'SIM Penetration', 'Mobile connectivity as an economic proxy'],
 ];
 
 function Logo() {
@@ -48,9 +50,15 @@ export default function LandingPage() {
 
         <nav className="relative flex items-center justify-between px-6 md:px-12 py-6">
           <Logo />
-          <Link to="/login" className="border border-brand-500 text-brand-400 hover:bg-brand-500/10 rounded-lg px-5 py-2 text-sm font-semibold transition-colors">
-            Sign In
-          </Link>
+          <div className="flex items-center gap-3">
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-slate-300 hover:text-white border border-slate-700/60 hover:border-slate-500 rounded-lg px-4 py-2 text-sm font-semibold transition-colors">
+              <Code2 size={16} /> GitHub
+            </a>
+            <Link to="/login" className="border border-brand-500 text-brand-400 hover:bg-brand-500/10 rounded-lg px-5 py-2 text-sm font-semibold transition-colors">
+              Sign In
+            </Link>
+          </div>
         </nav>
 
         <div className="relative flex-1 flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto pb-16">
@@ -114,6 +122,21 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+
+        {/* ---------- METHODOLOGY NOTE (transparency is a feature) ---------- */}
+        <div className="max-w-3xl mx-auto mt-12 glass-card p-6 md:p-8 rounded-2xl">
+          <h3 className="text-lg font-semibold text-white">Methodology &amp; Transparency</h3>
+          <p className="text-slate-400 text-sm mt-3 leading-relaxed">
+            BOI scores use 5th–95th percentile normalization across all 9,308 Nigerian wards.
+            Unbanked rates are EFInA A2F 2020 <span className="text-slate-200">state-level</span> survey
+            data, disaggregated to ward level using bank-distance, NBS MPI poverty, and SIM-penetration
+            proxies — so ward figures are modelled estimates, not direct measurements. An LGA-level
+            upgrade is pending EFInA A2F 2023 microdata (requested).
+          </p>
+          <p className="text-xs text-slate-500 mt-4">
+            Data vintage: WorldPop 2020 · EFInA A2F 2020 · NBS MPI 2022 · OSM 2024
+          </p>
+        </div>
       </section>
 
       {/* ---------- CTA FOOTER ---------- */}
@@ -122,9 +145,15 @@ export default function LandingPage() {
         <p className="text-slate-400 max-w-xl mx-auto mt-3">
           Access the BankMap AI dashboard and start identifying your highest-opportunity wards today.
         </p>
-        <Link to="/login" className="inline-block bg-brand-600 hover:bg-brand-700 rounded-xl px-10 py-4 font-semibold text-white mt-8 transition-colors">
-          Sign In to Dashboard
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
+          <Link to="/login" className="inline-block bg-brand-600 hover:bg-brand-700 rounded-xl px-10 py-4 font-semibold text-white transition-colors">
+            Sign In to Dashboard
+          </Link>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 border border-slate-700 hover:border-slate-500 text-slate-200 rounded-xl px-8 py-4 font-semibold transition-colors">
+            <Code2 size={18} /> View Source on GitHub
+          </a>
+        </div>
         <p className="text-xs text-slate-600 mt-6">9,308 wards · 37 states · Powered by Cerebras AI</p>
       </section>
     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getBOIColor } from '../../utils/formatters';
+import { getBOIColor, formatNumber } from '../../utils/formatters';
 
+// Fallback percentile estimate, only used if the server didn't supply a real rank.
 function topPercentile(score) {
   if (score >= 70) return Math.max(1, Math.round((100 - score) * 3));
   if (score >= 40) return 50 + Math.round((70 - score) * 1.5);
@@ -13,7 +14,9 @@ const CONTEXT = {
   RED: 'Low opportunity — resources better deployed elsewhere',
 };
 
-export default function NationalRankBar({ boi_score, boi_label, ward_name, state_name }) {
+export default function NationalRankBar({
+  boi_score, boi_label, national_boi_rank, wards_with_more_unbanked, total_wards,
+}) {
   const score = boi_score ?? 0;
   const color = getBOIColor(boi_label);
   const [width, setWidth] = useState(0);
@@ -24,6 +27,13 @@ export default function NationalRankBar({ boi_score, boi_label, ward_name, state
     const t = setTimeout(() => setWidth(score), 60);
     return () => clearTimeout(t);
   }, [score]);
+
+  const total = total_wards || 9308;
+  const hasRealRank = national_boi_rank != null;
+  // Prefer the exact server rank; fall back to the heuristic estimate.
+  const percentile = hasRealRank
+    ? Math.max(1, Math.round((national_boi_rank / total) * 100))
+    : topPercentile(score);
 
   return (
     <div>
@@ -44,10 +54,25 @@ export default function NationalRankBar({ boi_score, boi_label, ward_name, state
         <span>0</span><span>40</span><span>70</span><span>100</span>
       </div>
 
-      <p className="text-sm font-semibold mt-3" style={{ color }}>
-        BOI {score}/100 — Top {topPercentile(score)}% nationally
-      </p>
-      <p className="text-xs text-slate-400 mt-1">{CONTEXT[boi_label] || ''}</p>
+      {hasRealRank ? (
+        <>
+          <p className="text-sm font-semibold mt-3" style={{ color }}>
+            Ranked #{formatNumber(national_boi_rank)} of {formatNumber(total)} wards by banking opportunity
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            BOI {score}/100 · top {percentile}% nationally
+            {wards_with_more_unbanked != null
+              && ` · ${formatNumber(wards_with_more_unbanked)} wards have larger unbanked populations`}
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-semibold mt-3" style={{ color }}>
+            BOI {score}/100 — Top {percentile}% nationally
+          </p>
+          <p className="text-xs text-slate-400 mt-1">{CONTEXT[boi_label] || ''}</p>
+        </>
+      )}
     </div>
   );
 }

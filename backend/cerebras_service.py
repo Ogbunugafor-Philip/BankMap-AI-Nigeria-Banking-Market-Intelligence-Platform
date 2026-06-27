@@ -23,32 +23,47 @@ CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "gpt-oss-120b")
 CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are a banking expansion analyst for a Nigerian commercial bank.
-Write ward intelligence briefs for bank managers.
-Use this exact structure with these exact markdown headers:
+SYSTEM_PROMPT = """You are a banking expansion analyst for a Nigerian commercial bank, \
+writing a ward intelligence brief for a branch manager who must decide where to deploy field officers.
 
-## Priority: [GREEN/AMBER/RED]
-
-**Who lives here**
-[1-2 sentences about the population and their needs]
-
-**Why this ward matters**
-[1-2 sentences about the key opportunity or gap]
-
-**Recommended approach**
-[1-2 sentences on banking strategy for this population]
-
-**FSO recommendation**
-[X Field Service Officer(s)] based on [unbanked adults figure]
-
-Keep each section to 1-2 sentences maximum.
-Total response: 80 words maximum.
-No bullet points. No dashes. Clean paragraphs only."""
+Write two to three short, flowing paragraphs of plain prose. Hard rules:
+- Under 200 words total.
+- No markdown headers, no bullet points, no dashes, no numbered lists. Paragraphs only.
+- Open with one specific sentence that names the ward, its LGA and state, and the exact number of unbanked adults.
+- Ground every claim in the figures provided. Do not invent numbers or facts.
+- Never use these phrases, or anything like them: "vibrant community", "untapped potential", \
+"last mile", "financial inclusion journey", "banking the unbanked", or generic financial-inclusion \
+buzzwords. Be concrete and specific to this ward's data.
+- End with one single, concrete, highest-impact recommendation for this ward — not a list of options."""
 
 
 def _suggested_fso_count(unbanked_adults: int) -> int:
     """1 FSO per 15,000 unbanked adults, clamped to 1–4."""
     return max(1, min(4, round(unbanked_adults / 15000)))
+
+
+def _distance_guidance(km: float) -> str:
+    """Concrete framing for the bank-access gap, banded by distance."""
+    if km < 5:
+        return ("with a branch within walking distance, the gap is service quality "
+                "and product fit, not physical access")
+    if km < 10:
+        return "a moderate access gap that agent banking can bridge"
+    if km < 20:
+        return ("a significant 10km+ gap making this a strong candidate for agent "
+                "or mobile-first deployment")
+    return ("critically underserved — over 20km from the nearest branch, requiring "
+            "a dedicated field presence")
+
+
+def _tier_guidance(label: str) -> str:
+    """How to characterise the BOI tier."""
+    return {
+        "GREEN": "ranks in the top opportunity tier nationally",
+        "AMBER": "is mid-tier opportunity — monitor and assess in 6 months",
+        "RED": ("is lower immediate opportunity, likely due to small market size or "
+                "existing service coverage"),
+    }.get(label, "has an unrated opportunity profile")
 
 
 def _build_user_prompt(ward: dict, boi: dict) -> str:
@@ -68,24 +83,30 @@ def _build_user_prompt(ward: dict, boi: dict) -> str:
     boi_label = boi.get("boi_label")
     confidence_pct = round((boi.get("data_confidence") or 0) * 100)
 
-    return f"""Write a deployment brief for {ward_name} ward, {lga_name} LGA,
-{state_name} State.
+    distance_guidance = _distance_guidance(nearest_bank_km)
+    tier_guidance = _tier_guidance(boi_label)
+    fso = _suggested_fso_count(unbanked_adults)
 
-USE ONLY THESE FACTS:
+    return f"""Write the brief for {ward_name} ward, {lga_name} LGA, {state_name} State.
+
+Facts (use only these, do not invent others):
 - Population: {population:,}
-- Unbanked adults: {unbanked_adults:,} ({unbanked_pct}% of population)
+- Unbanked adults: {unbanked_adults:,} ({unbanked_pct}% of the population)
 - Nearest bank branch: {nearest_bank_km} km away
-- SIM penetration: {sim_pct}% (economic connectivity proxy)
-- Poverty index: {poverty_index:.2f} (0=wealthy, 1=very poor)
-- BOI score: {boi_score}/100 ({boi_label})
+- SIM penetration: {sim_pct}%
+- Poverty index: {poverty_index:.2f} (0 = wealthy, 1 = very poor)
+- Banking Opportunity Index: {boi_score}/100 ({boi_label})
 - Data confidence: {confidence_pct}%
 
-Focus on:
-1. Who lives here and their banking needs
-2. Why this ward is or is not a priority
-3. What banking approach suits this population
-4. Recommended FSO count based on population size only
-   (1 FSO per 15,000 unbanked adults, minimum 1, maximum 4)"""
+Interpretation you must weave in, in your own words:
+- Bank access: {nearest_bank_km} km is {distance_guidance}.
+- Opportunity tier: this ward {tier_guidance}.
+
+Open with one specific sentence that names {ward_name}, {lga_name}, {state_name} and the \
+{unbanked_adults:,} unbanked adults. Explain who is likely underserved and which products fit, \
+using the bank-access and tier framing above. Close with one concrete recommendation — the single \
+highest-impact action for this ward. Population-based sizing suggests roughly {fso} field officer(s); \
+mention this only if it forms part of that single recommendation."""
 
 
 def generate_deployment_brief(ward: dict, boi: dict, timeout: int = 60) -> dict:
@@ -133,26 +154,41 @@ def generate_deployment_brief(ward: dict, boi: dict, timeout: int = 60) -> dict:
 
 
 def _template_brief(ward: dict, boi: dict) -> str:
-    """Deterministic fallback brief — demographics + strategy, no ROI figures."""
+    """Deterministic fallback brief — flowing prose, no ROI figures, no buzzwords."""
     pop = ward.get("population") or 0
     rate = ward.get("unbanked_rate") or 0
     unbanked = int(pop * rate)
     label = boi.get("boi_label")
+    score = boi.get("boi_score")
     fso = _suggested_fso_count(unbanked)
     distance = round(ward.get("nearest_bank_distance_km") or 0, 1)
     sim_pct = round((ward.get("sim_penetration") or 0) * 100)
-    priority = (
-        "a high-priority deployment target" if label == "GREEN"
-        else "a monitor-and-plan ward" if label == "AMBER"
-        else "a low-priority ward"
-    )
+    name = ward.get("name")
+    lga = ward.get("lga_name")
+    state = ward.get("state_name")
+
+    access = _distance_guidance(distance)
+    tier = _tier_guidance(label)
+
+    # Single highest-impact recommendation, chosen by access gap and tier.
+    if distance >= 20:
+        action = (f"establish a dedicated field presence of {fso} officer(s) with agent "
+                  f"onboarding, since no branch is realistically reachable")
+    elif distance >= 10:
+        action = (f"deploy {fso} field officer(s) running agent and mobile-first account "
+                  f"opening, leveraging the {sim_pct}% SIM penetration")
+    elif label == "RED":
+        action = ("hold direct investment and revisit after the next data refresh; the "
+                  "near-term return does not justify a dedicated team")
+    else:
+        action = (f"prioritise product fit and {sim_pct}%-SIM mobile onboarding over new "
+                  f"physical access, deploying {fso} officer(s) on low-cost savings and agent accounts")
+
     return (
-        f"- {ward.get('name')} ward ({ward.get('lga_name')} LGA, {ward.get('state_name')} State) "
-        f"has {pop:,} residents, of whom about {unbanked:,} ({round(rate*100)}%) are unbanked.\n"
-        f"- Banking Opportunity Index {boi.get('boi_score')}/100 ({label}) makes it {priority}.\n"
-        f"- The nearest branch is {distance} km away, so agent banking and mobile-first "
-        f"onboarding suit this population (SIM penetration {sim_pct}%).\n"
-        f"- Recommended approach: low-cost savings and agent accounts; prioritise "
-        f"financial-literacy outreach given the unbanked share.\n"
-        f"- Suggested field team: {fso} Field Sales Officer(s), sized to the unbanked population."
+        f"{name} ward in {lga} LGA, {state} State, has about {unbanked:,} unbanked adults among "
+        f"{pop:,} residents ({round(rate * 100)}% of the population). At {distance} km to the nearest "
+        f"branch, this is {access}. "
+        f"On the Banking Opportunity Index it scores {score}/100 and {tier}, so the population is best "
+        f"served by low-cost savings and agent accounts rather than a full branch. "
+        f"The single highest-impact move is to {action}."
     )
